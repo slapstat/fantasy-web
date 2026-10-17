@@ -172,8 +172,12 @@ export class ScoutTableComponent {
       : 'Rank among every player in the league',
   );
 
-  readonly scoreHeading = computed(() =>
-    this.scoringType() === 'points' ? 'Proj. pts' : 'Z-Score',
+  readonly scoreHeading = computed(() => (this.scoringType() === 'points' ? 'Points' : 'Z-Score'));
+
+  readonly scoreTip = computed(() =>
+    this.scoringType() === 'points'
+      ? 'Projected points for the rest of the season.'
+      : 'Rest-of-season AI projection',
   );
 
   ariaSort(key: ScoutSortKey): 'ascending' | 'descending' | null {

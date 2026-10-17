@@ -235,12 +235,8 @@
                     <thead>
                       <tr>
                         <th scope="col">Player</th>
-                        <th
-                          scope="col"
-                          class="num roster-col--wide"
-                          appTooltip="Projected points for the rest of the season."
-                        >
-                          Proj.
+                        <th scope="col" class="num roster-col--wide" [appTooltip]="scoreTip()">
+                          {{ scoreHeading() }}
                         </th>
                         @if (compare()) {
                           <th scope="col" class="num roster-col--wide">Change</th>
