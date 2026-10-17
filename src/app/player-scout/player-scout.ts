@@ -311,9 +311,15 @@ export class PlayerScoutComponent {
     this.compare() ? (this.list()?.since ?? null) : null,
   );
 
-  /** What the then-lines are, for the table's heading: "vs 7 Oct", "vs preseason". */
   /** Which earlier projection actually answered, under the picker; empty until it has. */
   readonly sinceCaption = computed(() => sinceCaption(this.sinceAnswer()));
+
+  /**
+   * The first day a projection is kept for this season, the floor of the day picker: the BFF
+   * reports it with every answer, comparison on or off, so the picker knows it before the first
+   * day is picked. Null until the list has answered, or while nothing is kept.
+   */
+  readonly earliestKept = computed(() => this.list()?.since.earliestSnapshot ?? null);
 
   /** Whether the list is on the page: the room for a pickup is only worth a line above one. */
   readonly listReady = computed(

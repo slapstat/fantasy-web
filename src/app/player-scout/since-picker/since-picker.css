@@ -1,5 +1,6 @@
 /* One choice of three, drawn as the page's other segmented controls are: off, the preseason, or
-   a day in a field. The field is a segment too, so the three read as one control. */
+   a day. The day is a segment too, so the three read as one control; the platform's date field
+   sits hidden under it, and only lends it the picker. */
 :host {
   display: inline-block;
 }
@@ -21,24 +22,35 @@
   font: inherit;
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  gap: var(--space-2);
+  gap: var(--space-1);
   line-height: 1.2;
   padding: var(--space-1) var(--space-3);
-  transition: background var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
-.segment + .segment {
+.segment + .segment,
+.day {
   border-left: 1px solid var(--color-border-control);
 }
 
-.segment:hover:not(.segment--active) {
+.segment:hover:not(.segment--active):not(:disabled) {
   background: var(--color-surface-hover);
+  color: var(--color-primary);
 }
 
-.segment:focus-visible,
-.segment:has(:focus-visible) {
+.segment:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
+}
+
+/* Nothing to pick yet: faded as a whole, icon and all, so it reads as out of reach rather than
+   as a day not yet chosen. */
+.segment:disabled {
+  color: var(--color-text-subtle);
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .segment--active {
@@ -47,41 +59,37 @@
   font-weight: var(--weight-semibold);
 }
 
-.date-label {
+/* The day's segment: the picker's icon, then the day in figures that line up from one day to
+   the next, so "7 Oct" and "17 Oct" do not nudge the control's width about. */
+.day {
+  display: inline-flex;
+  position: relative;
+}
+
+.segment--day app-icon {
+  flex: none;
+  opacity: 0.8;
+}
+
+.segment--active app-icon {
+  opacity: 1;
+}
+
+.day-text {
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-/* Drawn by us, not the platform, as the planner's date fields are: iOS Safari gives a native
-   date field its own width otherwise. Inside the segment it is a plain figure, so it reads as
-   the segment's label rather than a second control. */
-.field-date {
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  border: none;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-  min-width: 0;
+/* The field under the segment: the same box, so the picker the browser opens is anchored on the
+   segment, and no size, colour or hit of its own. */
+.day-field {
+  border: 0;
+  height: 100%;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
   padding: 0;
-}
-
-.field-date::-webkit-date-and-time-value {
-  min-height: 1.2em;
-  text-align: left;
-}
-
-.field-date:focus-visible {
-  outline: none;
-}
-
-.segment--active .field-date {
-  color: var(--color-primary-contrast);
-  font-weight: var(--weight-semibold);
-}
-
-.segment--active .field-date::-webkit-calendar-picker-indicator {
-  filter: invert(1);
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
 }
