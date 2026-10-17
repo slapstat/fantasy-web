@@ -122,16 +122,12 @@
                     <!-- Waivers is his status, not a position, so it follows the chips rather than
                          standing among them. Only a claim is marked: an add is what the list is a
                          list of. After the chips, not by the name, since on a phone the name line
-                         has no room for it and it took a line of its own. -->
+                         has no room for it and it took a line of its own. The yellow pill Player
+                         Scout gives a claim, worded, so it needs no tooltip on a phone. -->
                     @if (onWaivers(entry.row)) {
-                      <span
-                        class="player-status"
-                        role="img"
-                        aria-label="On waivers"
-                        tabindex="0"
-                        appTooltip="On waivers"
-                      >
+                      <span class="player-status">
                         <app-icon name="hourglass" [size]="14" />
+                        <span>Waivers</span>
                       </span>
                     }
                   </span>

@@ -313,6 +313,8 @@ describe('ScoutTableComponent', () => {
     expect(ngMocks.findAll(withOwners, '.scout-tag').map((tag) => ngMocks.formatText(tag))).toEqual(
       ['FA', 'Waivers'],
     );
+    // Yellow for the claim, a wait; the add keeps the green.
+    expect(ngMocks.findAll(withOwners, '.scout-tag--waivers')).toHaveLength(1);
   });
 
   it("dims another team's player only on a list with someone to pick up", () => {

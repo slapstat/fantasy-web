@@ -140,6 +140,14 @@
   color: var(--color-primary-contrast);
 }
 
+/* A claim is pickable too, but not now: the yellow says wait where the green says go. The brown
+   ink reads 4.6:1 on it; white cannot sit on this yellow. */
+.scout-tag--waivers {
+  background: var(--color-warning);
+  border-color: var(--color-warning);
+  color: var(--color-warning-text);
+}
+
 .scout-tag--mine {
   background: var(--color-primary);
   border-color: var(--color-primary);
