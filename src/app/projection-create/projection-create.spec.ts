@@ -429,6 +429,34 @@ describe('ProjectionCreateComponent', () => {
     expect(component.isCreating()).toEqual(false);
   });
 
+  // The toast is all the user sees; the report behind it is all we see, so it carries what the
+  // BFF answered rather than the sentence alone.
+  it('reports what the server answered when it refuses for a reason the page has no words for', async () => {
+    createProjection.mockReturnValueOnce(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: { code: 'BAD_REQUEST', message: 'source=rest_of_season is unavailable' },
+          }),
+      ),
+    );
+    const fixture = MockRender(ProjectionCreateComponent);
+    await fixture.whenStable();
+    const component = fixture.point.componentInstance;
+
+    component.name.set('Dynasty');
+    component.create();
+
+    expect(notifyError).toHaveBeenCalledWith("Couldn't create the projection. Please try again.", {
+      status: 400,
+      code: 'BAD_REQUEST',
+      message: 'source=rest_of_season is unavailable',
+    });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(component.isCreating()).toEqual(false);
+  });
+
   describe('the three groups of starting points', () => {
     const listed = [
       { ...summary, id: 'own1', kind: 'projection' as const, name: 'Dynasty' },

@@ -548,7 +548,13 @@ export class ProjectionCreateComponent {
             // lapsed while the page was open, or an entitlement read that never landed.
             this.notification.error(PREMIUM_REFUSED_MESSAGE);
           } else {
-            this.notification.error("Couldn't create the projection. Please try again.");
+            // The report behind this toast is all anyone sees of a refusal the page did not
+            // expect, so it carries what the BFF answered. FANTASY-WEB-H arrived as the bare
+            // sentence, and the 400 behind it had to be dug out of the breadcrumbs.
+            this.notification.error(
+              "Couldn't create the projection. Please try again.",
+              refusalContext(error),
+            );
           }
         },
       });
@@ -561,6 +567,19 @@ export class ProjectionCreateComponent {
  * `hasStartingPoint`.
  */
 const NOTHING_TO_COPY: StartingPoint = { kind: 'copy', id: null };
+
+/**
+ * What a failed create answered, for the report and never the screen: the status, and the code
+ * and sentence of the BFF's ErrorDto when the body was one. Undefined for a failure that was not
+ * an HTTP answer at all, such as a timeout, which the report names on its own.
+ */
+function refusalContext(error: unknown): Record<string, unknown> | undefined {
+  if (!(error instanceof HttpErrorResponse)) {
+    return undefined;
+  }
+  const body = error.error as { code?: unknown; message?: unknown } | null;
+  return { status: error.status, code: body?.code, message: body?.message };
+}
 
 /** What a league changed on this page is filed under: the presets together, each board apart. */
 function startingPointKey(point: StartingPoint): string {

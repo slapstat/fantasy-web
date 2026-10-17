@@ -4,7 +4,7 @@ import { from } from 'rxjs';
 import { Api } from '../api/api';
 import { getFeatures } from '../api/fn/features/get-features';
 import { CreateProjectionRequest } from '../api/models/create-projection-request';
-import { MODEL_SOURCES } from '../models/ai-projection';
+import { MODEL_SOURCES, REST_OF_SEASON_PRESET_SOURCE } from '../models/ai-projection';
 
 /**
  * What the BFF says this environment serves, read once per page load.
@@ -71,16 +71,30 @@ export class FeatureService {
   );
 
   /**
-   * The presets this environment offers: every one of them where the AI projection is served,
-   * and everything but the model-seeded ones where it is not. A starting point the server will not
-   * fill in must not be offered, on any page that lists presets.
+   * The presets this environment offers: everything but the model-seeded ones where the AI
+   * projection is not served, and everything but the rest of the season where that preset is
+   * switched off on its own. A starting point the server will not fill in must not be offered,
+   * on any page that lists presets.
+   *
+   * <p>The rest of the season has its own switch on the BFF, over and above the AI projection's,
+   * and it was off in production while this method offered the preset wherever the model was
+   * served. Nothing showed until the season started: `RestOfSeasonService` hid the preset between
+   * seasons, and on the season's first day it appeared for everyone, with a preview the BFF
+   * answered 404 and a Create it refused with 400 (FANTASY-WEB-H, 2026-10-17).
    */
   offeredPresets<T extends { readonly source: CreateProjectionRequest['source'] }>(
     presets: readonly T[],
   ): readonly T[] {
-    if (this.aiProjection()) {
-      return presets;
+    return presets.filter((preset) => this.serves(preset.source ?? ''));
+  }
+
+  private serves(source: string): boolean {
+    if (!MODEL_SOURCES.includes(source)) {
+      return true;
     }
-    return presets.filter((preset) => !MODEL_SOURCES.includes(preset.source ?? ''));
+    if (!this.aiProjection()) {
+      return false;
+    }
+    return source !== REST_OF_SEASON_PRESET_SOURCE || this.restOfSeasonPreset();
   }
 }
