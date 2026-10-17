@@ -216,7 +216,11 @@
                 [attr.aria-expanded]="rosterOpen()"
                 (click)="toggleRoster()"
               >
-                Show all ({{ roster().length }})
+                @if (rosterOpen()) {
+                  Show less
+                } @else {
+                  Show all ({{ roster().length }})
+                }
                 <app-icon class="chevron" name="chevron-down" [size]="14" />
               </button>
             }
