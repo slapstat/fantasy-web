@@ -560,7 +560,7 @@ describe('PlayerScoutComponent', () => {
     const headings = ngMocks
       .findAll(fixture, '.roster-table thead th')
       .map((th) => ngMocks.formatText(th));
-    expect(headings).toEqual(['Player', 'Proj.', 'Starts/Games left', 'Cost to drop']);
+    expect(headings).toEqual(['Player', 'Points', 'Starts/Games left', 'Cost to drop']);
     expect(ngMocks.formatText(ngMocks.find(fixture, '.roster-more'))).toBe('Show all 12');
   });
 

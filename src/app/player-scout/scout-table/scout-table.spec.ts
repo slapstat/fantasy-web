@@ -227,7 +227,7 @@ describe('ScoutTableComponent', () => {
     expect(headings).toEqual([
       '#',
       'Player',
-      'Proj. pts',
+      'Points',
       'Games',
       'Ice / game',
       'PP / game',

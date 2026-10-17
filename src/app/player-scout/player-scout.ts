@@ -347,6 +347,14 @@ export class PlayerScoutComponent {
 
   readonly scoringType = computed(() => this.scoring().scoringType);
 
+  readonly scoreHeading = computed(() => (this.scoringType() === 'points' ? 'Points' : 'Z-Score'));
+
+  readonly scoreTip = computed(() =>
+    this.scoringType() === 'points'
+      ? 'Projected points for the rest of the season.'
+      : 'Projected Z-Score for the rest of the season.',
+  );
+
   readonly categories = computed<readonly ScoringStatKey[]>(() => [
     ...this.scoring().activeScoringColumns,
   ]);
