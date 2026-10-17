@@ -40,14 +40,40 @@ describe('FeatureService', () => {
     ]);
   });
 
-  it('offers every preset where the BFF serves the AI projection', async () => {
-    invoke.mockResolvedValue({ aiProjection: true });
+  it('offers every preset where the BFF serves the AI projection and the rest of the season', async () => {
+    invoke.mockResolvedValue({ aiProjection: true, restOfSeasonPreset: true });
 
     const service = await answered();
 
     expect(invoke).toHaveBeenCalledWith(getFeatures);
     expect(service.aiProjection()).toEqual(true);
     expect(service.offeredPresets(presets)).toEqual(presets);
+  });
+
+  // The rest of the season has a switch of its own on the BFF. Off, the BFF answers its preview
+  // 404 and refuses to create from it, so offering it is a card every press on which fails.
+  it('drops the rest-of-season preset where only that is switched off, and keeps the model', async () => {
+    invoke.mockResolvedValue({ aiProjection: true, restOfSeasonPreset: false });
+
+    const service = await answered();
+
+    expect(service.offeredPresets(presets).map((preset) => preset.source)).toEqual([
+      'default',
+      'model',
+      'blank',
+    ]);
+  });
+
+  it('drops the rest-of-season preset where the BFF says nothing about it', async () => {
+    invoke.mockResolvedValue({ aiProjection: true });
+
+    const service = await answered();
+
+    expect(service.offeredPresets(presets).map((preset) => preset.source)).toEqual([
+      'default',
+      'model',
+      'blank',
+    ]);
   });
 
   it('drops the model preset where the BFF does not serve it', async () => {

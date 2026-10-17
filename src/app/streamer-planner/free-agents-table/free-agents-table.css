@@ -159,18 +159,27 @@
   min-width: 0;
 }
 
-/* Waivers only: a claim is the one status that changes what the reader does next. Amber and
-   round, so it never reads as one more position chip; the dark gold carries the contrast. */
+/* Waivers only: a claim is the one status that changes what the reader does next. The yellow
+   pill Player Scout gives a claim, so the two pages say it alike; the brown ink reads 4.6:1 on
+   the yellow, which white cannot sit on. */
 .player-status {
   align-items: center;
-  background: var(--color-warning-surface);
-  border: 1px solid var(--color-warning-border);
+  background: var(--color-warning);
+  border: 1px solid var(--color-warning);
   border-radius: var(--radius-pill);
   color: var(--color-warning-text);
   display: inline-flex;
   flex: none;
-  justify-content: center;
-  padding: 2px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  gap: 0.2rem;
+  line-height: 1.4;
+  padding: 0 var(--space-2);
+  white-space: nowrap;
+}
+
+.player-status app-icon {
+  flex: none;
 }
 
 /* A figure with what a drop would add raised at its top right, where a footnote's mark goes. The

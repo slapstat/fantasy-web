@@ -186,13 +186,18 @@
                     <app-position-chips [positions]="entry.row.player.positions" />
                   </span>
                   <!-- What the row is to the reader: one he can pick up, his own, or another team's.
-                       The pickable wear the one green pill in the column, "FA" or "Waivers", so the
-                       eye finds them without reading; "FA" is left off a list of nothing else. His
+                       The pickable wear the one filled pill in the column, so the eye finds them
+                       without reading: green "FA" for an add, yellow "Waivers" with the hourglass
+                       for a claim, which is a wait and not a pickup; "FA" is left off a list of
+                       nothing else. His
                        own team is the filled pill the league table's You badge wears, with a figure
                        in front of the name so the mark is not colour alone. Another team's name is
                        plain text, no chip: it is context, not something to find. -->
                   @if (availabilityTag(entry.row); as tag) {
-                    <span class="scout-tag scout-tag--free">
+                    <span
+                      class="scout-tag scout-tag--free"
+                      [class.scout-tag--waivers]="onWaivers(entry.row)"
+                    >
                       @if (onWaivers(entry.row)) {
                         <app-icon name="hourglass" [size]="14" />
                       }
