@@ -95,9 +95,7 @@ export class RosterTableComponent {
     });
   });
 
-  readonly scoreHeading = computed(() =>
-    this.scoringType() === 'points' ? 'Proj. pts' : 'Z-Score',
-  );
+  readonly scoreHeading = computed(() => (this.scoringType() === 'points' ? 'Points' : 'Z-Score'));
 
   readonly scoreTip = computed(() =>
     this.scoringType() === 'points'
