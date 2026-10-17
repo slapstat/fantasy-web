@@ -352,7 +352,7 @@ export class PlayerScoutComponent {
   readonly scoreTip = computed(() =>
     this.scoringType() === 'points'
       ? 'Projected points for the rest of the season.'
-      : 'Rest-of-season AI projection',
+      : 'Projected Z-Score for the rest of the season.',
   );
 
   readonly categories = computed<readonly ScoringStatKey[]>(() => [
