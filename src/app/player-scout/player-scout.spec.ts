@@ -165,7 +165,12 @@ function league(): ScoutList {
   const waived = scoutPlayer(skater(98, 8, 8), skater(98, 8, 8), ['LW']);
   return {
     inSeason: true,
-    since: { requested: '2026-10-07', kind: 'SNAPSHOT', resolved: '2026-10-07' },
+    since: {
+      requested: '2026-10-07',
+      kind: 'SNAPSHOT',
+      resolved: '2026-10-07',
+      earliestSnapshot: '2026-10-08',
+    },
     recentGames: DEFAULT_RECENT_GAMES,
     players: [
       ...depth,
@@ -261,6 +266,10 @@ describe('PlayerScoutComponent', () => {
     expect(ngMocks.input(table, 'compare')).toBe(false);
     expect(ngMocks.input(table, 'view')).toBe('projection');
     expect(ngMocks.input(ngMocks.find(fixture, SincePickerComponent), 'on')).toBe(false);
+    // The floor of the day picker is known before any comparison is on.
+    expect(ngMocks.input(ngMocks.find(fixture, SincePickerComponent), 'earliestKept')).toBe(
+      '2026-10-08',
+    );
     expect(page.sinceAnswer()).toBeNull();
     expect(page.sinceCaption()).toBe('');
   });

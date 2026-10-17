@@ -1,7 +1,14 @@
 import { MockBuilder, MockRender, ngMocks } from 'ng-mocks';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ScoutSince } from '../../api/models/scout-since';
-import { daysBefore, formatDay, sinceCaption, SincePickerComponent } from './since-picker';
+import { IconComponent } from '../../shared/icon/icon';
+import {
+  daysBefore,
+  formatDay,
+  seasonFloor,
+  sinceCaption,
+  SincePickerComponent,
+} from './since-picker';
 
 const TODAY = '2026-10-14';
 
@@ -15,6 +22,12 @@ describe('the day arithmetic', () => {
   it('writes a day as the page does', () => {
     expect(formatDay('2026-10-07')).toBe('7 Oct');
     expect(formatDay(null)).toBe('');
+  });
+
+  it('floors a season at its first of October, on either side of the new year', () => {
+    expect(seasonFloor('2026-10-14')).toBe('2026-10-01');
+    expect(seasonFloor('2027-03-02')).toBe('2026-10-01');
+    expect(seasonFloor('2026-09-20')).toBe('2026-10-01');
   });
 });
 
@@ -63,21 +76,30 @@ describe('sinceCaption', () => {
 });
 
 describe('SincePickerComponent', () => {
-  beforeEach(() => MockBuilder(SincePickerComponent));
+  beforeEach(() => MockBuilder(SincePickerComponent).keep(IconComponent));
 
-  function render(on: boolean, since: string | null, sinceChange = vi.fn(), cleared = vi.fn()) {
+  function render(
+    on: boolean,
+    since: string | null,
+    earliestKept: string | null = '2026-10-07',
+    sinceChange = vi.fn(),
+    cleared = vi.fn(),
+  ) {
     const fixture = MockRender(SincePickerComponent, {
       on,
       since,
       today: TODAY,
+      earliestKept,
       sinceChange,
       cleared,
     });
     return { fixture, sinceChange, cleared };
   }
 
-  const segments = (fixture: ReturnType<typeof render>['fixture']) =>
-    ngMocks.findAll(fixture, '.segment');
+  type Fixture = ReturnType<typeof render>['fixture'];
+  const segments = (fixture: Fixture) => ngMocks.findAll(fixture, '.segment');
+  const daySegment = (fixture: Fixture) => ngMocks.find(fixture, '.segment--day');
+  const field = (fixture: Fixture) => ngMocks.find(fixture, 'input[type=date]');
 
   it('offers off, the preseason and a day, and marks off while no comparison is on', () => {
     const { fixture } = render(false, null);
@@ -87,7 +109,7 @@ describe('SincePickerComponent', () => {
     expect(all.map((segment) => ngMocks.formatText(segment))).toEqual([
       'Off',
       'Preseason',
-      'a day',
+      'Pick a day',
     ]);
     expect(all[0].attributes['aria-pressed']).toBe('true');
     expect(all[1].nativeElement.classList).not.toContain('segment--active');
@@ -102,51 +124,113 @@ describe('SincePickerComponent', () => {
     expect(all[1].attributes['aria-pressed']).toBe('true');
   });
 
-  it('marks the day as the pick once one is set, and keeps it no later than yesterday', () => {
+  it('wears the day as the page writes it once one is set, and marks it the pick', () => {
     const { fixture } = render(true, '2026-10-02');
 
-    const field = ngMocks.find(fixture, 'input[type=date]');
-    expect(field.attributes['max']).toBe('2026-10-13');
-    expect(field.nativeElement.value).toBe('2026-10-02');
-    expect(ngMocks.find(fixture, '.date-field').nativeElement.classList).toContain(
-      'segment--active',
-    );
+    const day = daySegment(fixture);
+    expect(ngMocks.formatText(day)).toBe('2 Oct');
+    expect(day.attributes['aria-pressed']).toBe('true');
+    expect(day.attributes['aria-label']).toBe('A day of your own: 2 Oct');
+    expect(field(fixture).nativeElement.value).toBe('2026-10-02');
     expect(segments(fixture)[1].attributes['aria-pressed']).toBe('false');
   });
 
-  it('emits null for the preseason and the day typed into the field, and off for off', () => {
+  it('keeps wearing the day while the comparison is off, without marking it', () => {
+    const { fixture } = render(false, '2026-10-02');
+
+    const day = daySegment(fixture);
+    expect(ngMocks.formatText(day)).toBe('2 Oct');
+    expect(day.attributes['aria-pressed']).toBe('false');
+  });
+
+  it('offers no day before the first kept nor later than yesterday', () => {
+    const { fixture } = render(true, '2026-10-09', '2026-10-07');
+
+    expect(field(fixture).attributes['min']).toBe('2026-10-07');
+    expect(field(fixture).attributes['max']).toBe('2026-10-13');
+  });
+
+  it("floors the field at the season's first of October while no day is kept", () => {
+    const { fixture } = render(false, null, null);
+
+    expect(field(fixture).attributes['min']).toBe('2026-10-01');
+    expect(daySegment(fixture).nativeElement.disabled).toBe(false);
+  });
+
+  it('keeps the day field out of the tab order and off the accessibility tree', () => {
+    const { fixture } = render(false, null);
+
+    expect(field(fixture).attributes['tabindex']).toBe('-1');
+    expect(field(fixture).attributes['aria-hidden']).toBe('true');
+  });
+
+  it('emits null for the preseason and the day picked in the field, and off for off', () => {
     const { fixture, sinceChange, cleared } = render(true, '2026-10-02');
-    const field = ngMocks.find(fixture, 'input[type=date]');
+    const input = field(fixture);
 
     ngMocks.click(segments(fixture)[1]);
-    field.nativeElement.value = '2026-10-10';
-    field.nativeElement.dispatchEvent(new Event('change'));
+    input.nativeElement.value = '2026-10-10';
+    input.nativeElement.dispatchEvent(new Event('change'));
     ngMocks.click(segments(fixture)[0]);
 
     expect(sinceChange.mock.calls).toEqual([[null], ['2026-10-10']]);
     expect(cleared).toHaveBeenCalledTimes(1);
   });
 
-  it('hands the field a week back when it is taken up from the preseason', () => {
+  it('switches on against a week back when the day segment is pressed from the preseason', () => {
     const { fixture, sinceChange } = render(true, null);
 
-    ngMocks.find(fixture, 'input[type=date]').nativeElement.dispatchEvent(new Event('focus'));
+    ngMocks.click(daySegment(fixture));
 
     expect(sinceChange).toHaveBeenCalledWith('2026-10-07');
   });
 
-  it('switches the comparison back on against the day it kept when the field is taken up', () => {
+  it('switches on against the first kept day when a week back is before it', () => {
+    const { fixture, sinceChange } = render(true, null, '2026-10-10');
+
+    ngMocks.click(daySegment(fixture));
+
+    expect(sinceChange).toHaveBeenCalledWith('2026-10-10');
+  });
+
+  it('switches the comparison back on against the day it kept when the segment is pressed', () => {
     const { fixture, sinceChange } = render(false, '2026-10-02');
 
-    ngMocks.find(fixture, 'input[type=date]').nativeElement.dispatchEvent(new Event('focus'));
+    ngMocks.click(daySegment(fixture));
 
     expect(sinceChange).toHaveBeenCalledWith('2026-10-02');
   });
 
-  it('leaves the pick alone when the field is taken up while it is the pick', () => {
+  it('opens the picker, and leaves the pick alone, when pressed while it is the pick', () => {
     const { fixture, sinceChange } = render(true, '2026-10-02');
+    const showPicker = vi.fn();
+    field(fixture).nativeElement.showPicker = showPicker;
 
-    ngMocks.find(fixture, 'input[type=date]').nativeElement.dispatchEvent(new Event('focus'));
+    ngMocks.click(daySegment(fixture));
+
+    expect(showPicker).toHaveBeenCalledTimes(1);
+    expect(sinceChange).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the field itself where the browser will not show a picker', () => {
+    const { fixture } = render(true, '2026-10-02');
+    const input = field(fixture).nativeElement as HTMLInputElement;
+    input.showPicker = vi.fn(() => {
+      throw new DOMException('no activation', 'NotAllowedError');
+    });
+    const focus = vi.spyOn(input, 'focus');
+
+    ngMocks.click(daySegment(fixture));
+
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables the day while the season has no kept day before today', () => {
+    const { fixture, sinceChange } = render(false, null, '2026-10-14');
+
+    const day = daySegment(fixture);
+    expect(day.nativeElement.disabled).toBe(true);
+    ngMocks.click(day);
 
     expect(sinceChange).not.toHaveBeenCalled();
   });
