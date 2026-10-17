@@ -198,7 +198,7 @@ describe('FreeAgentsTableComponent', () => {
     const fixture = render();
     const table = fixture.point.componentInstance;
 
-    expect(table.scoreHeading()).toBe('Proj. pts');
+    expect(table.scoreHeading()).toBe('Points');
     expect(table.score(SKATER)).toBe('11.3');
     expect(table.perGame(SKATER)).toBe('3.0/G');
 
@@ -581,7 +581,7 @@ describe('FreeAgentsTableComponent headings', () => {
     const buttons = ngMocks.findAll(fixture, 'thead button.sort');
     expect(buttons.map((button) => ngMocks.formatText(button))).toEqual([
       'Player',
-      'Proj. pts',
+      'Points',
       'GP',
       'TOI',
       'G',
