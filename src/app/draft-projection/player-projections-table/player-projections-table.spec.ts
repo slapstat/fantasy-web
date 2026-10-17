@@ -467,8 +467,9 @@ describe('PlayerProjectionsTableComponent', () => {
       component.rookiesOnly.set(true);
       TestBed.inject(ApplicationRef).tick();
 
-      // Draisaitl alone on screen, third in this category league's ranking.
-      expect(rankCells()).toEqual(['1 (3)']);
+      // Draisaitl alone on screen, second in this category league's ranking: the skaters' replacement
+      // player, level at nought with the lone goalie, whom the order breaks him ahead of.
+      expect(rankCells()).toEqual(['1 (2)']);
     });
 
     it('offers no filter when the server could not say who is a rookie', async () => {

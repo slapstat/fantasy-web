@@ -22,16 +22,17 @@ const DEFAULT_GOALIE_POOL_SIZE = 32;
 const MAX_POOL_ITERATIONS = 10;
 
 /**
- * Where a z-score's nought sits. `'pool'`: at the pool's average line, so a player below it scores
- * less than nothing — right for a season board, where the question is whether he is better or
- * worse than the players a team could take instead. `'empty'`: at a line with nothing in it, so
- * every game played adds and only what hurts a team takes away (a loss, goals against, a ratio
- * dragged down) — right for a week, where a player with one start still helps the team he starts
- * for, and a score a game has to be that game's own. Each category is still divided by the pool's
- * spread, so within skaters, or within goalies, the order is the same either way: the two differ
- * by one constant per pool.
+ * Where a z-score's nought sits. `'replacement'`: at the replacement player, the worst one the
+ * pool still holds (the last a league of that size would roster), so every rostered player adds
+ * and only one worse than what a team could pick up instead scores less than nothing — right for
+ * a season board, where the question is how much better he is than the wire. `'empty'`: at a line
+ * with nothing in it, so every game played adds and only what hurts a team takes away (a loss,
+ * goals against, a ratio dragged down) — right for a week, where a player with one start still
+ * helps the team he starts for, and a score a game has to be that game's own. Each category is
+ * still divided by the pool's spread, so within skaters, or within goalies, the order is the same
+ * either way: the two differ by one constant per pool.
  */
-export type ZScoreOrigin = 'pool' | 'empty';
+export type ZScoreOrigin = 'replacement' | 'empty';
 
 interface PoolEntry<P extends Projection> {
   projection: P;
@@ -151,7 +152,7 @@ export class ProjectionCalculationService {
     activeScoringColumns: Set<ScoringStatKey>,
     skaterPoolSize: number = DEFAULT_SKATER_POOL_SIZE,
     goaliePoolSize: number = DEFAULT_GOALIE_POOL_SIZE,
-    origin: ZScoreOrigin = 'pool',
+    origin: ZScoreOrigin = 'replacement',
   ): number[] {
     const totalsByIndex: number[] = projections.map(() => 0);
     this.scorePools(
@@ -177,7 +178,7 @@ export class ProjectionCalculationService {
     activeScoringColumns: Set<ScoringStatKey>,
     skaterPoolSize: number = DEFAULT_SKATER_POOL_SIZE,
     goaliePoolSize: number = DEFAULT_GOALIE_POOL_SIZE,
-    origin: ZScoreOrigin = 'pool',
+    origin: ZScoreOrigin = 'replacement',
   ): Record<string, number>[] {
     const contributionsByIndex: Record<string, number>[] = projections.map(() => ({}));
     this.scorePools(
@@ -211,7 +212,7 @@ export class ProjectionCalculationService {
       activeScoringColumns,
       skaterPoolSize,
       goaliePoolSize,
-      'pool',
+      'replacement',
       projections.map(() => 0),
       null,
       scales,
@@ -317,6 +318,9 @@ export class ProjectionCalculationService {
       poolPositions = nextPositions;
       zScores = this.zScoresForPool(categories, poolPositions, entries.length, origin);
     }
+    if (origin === 'replacement') {
+      this.shiftToReplacement(zScores, poolPositions);
+    }
 
     entries.forEach((entry, position) => {
       totalsByIndex[entry.index] = zScores.totals[position];
@@ -342,6 +346,38 @@ export class ProjectionCalculationService {
       });
       contributionsByIndex[entry.index] = contributions;
     });
+  }
+
+  /**
+   * Moves nought from the pool's average to its worst member, category by category, so the
+   * breakdown still sums to the total. The spread is measured from the mean, but half the pool
+   * sits under it, and a rostered player reading as less than nothing says his team would be
+   * better off without him. One constant per pool, so no order and no difference moves.
+   */
+  private shiftToReplacement(zScores: PoolZScores, poolPositions: number[]): void {
+    if (poolPositions.length === 0) {
+      return;
+    }
+    const { totals, byCategory } = zScores;
+    let replacement = poolPositions[0];
+    for (const position of poolPositions) {
+      if (totals[position] < totals[replacement]) {
+        replacement = position;
+      }
+    }
+    const offset = totals[replacement];
+    for (let position = 0; position < totals.length; position++) {
+      totals[position] -= offset;
+    }
+    for (const categoryZScores of byCategory) {
+      if (!categoryZScores) {
+        continue;
+      }
+      const categoryOffset = categoryZScores[replacement];
+      for (let position = 0; position < categoryZScores.length; position++) {
+        categoryZScores[position] -= categoryOffset;
+      }
+    }
   }
 
   /**
@@ -383,8 +419,9 @@ export class ProjectionCalculationService {
       if (stdDev === 0) {
         return;
       }
-      // The spread is the pool's whichever the origin; only where nought sits moves.
-      const centre = origin === 'pool' ? mean : 0;
+      // The spread is the pool's whichever the origin. Measured from the mean here; nought moves to
+      // the replacement player once the pool has settled, since he is the pool's worst.
+      const centre = origin === 'replacement' ? mean : 0;
       const categoryZScores = new Float64Array(size);
       for (let position = 0; position < size; position++) {
         const zScore = (direction * (values[position] - centre)) / stdDev;

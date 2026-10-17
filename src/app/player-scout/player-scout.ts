@@ -365,7 +365,7 @@ export class PlayerScoutComponent {
   readonly scoreTip = computed(() =>
     this.scoringType() === 'points'
       ? 'Projected points for the rest of the season.'
-      : 'Projected Z-Score for the rest of the season.',
+      : 'Projected Z-Score for the rest of the season. Zero is the last player a league this size would roster.',
   );
 
   readonly dropCostTip = computed(() =>

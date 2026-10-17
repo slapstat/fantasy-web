@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ProjectionCalculationService } from './projection-calculation.service';
-import { GoalieProjection, SkaterProjection } from '../models/projection.model';
+import { GoalieProjection, Projection, SkaterProjection } from '../models/projection.model';
 import {
   ScoringStatKey,
   SKATER_SCORING_STAT_KEYS,
@@ -81,8 +81,9 @@ describe('ProjectionCalculationService.computeZScores', () => {
       new Set<ScoringStatKey>(['goals']),
     );
 
-    expect(result[0]).toBeCloseTo(-1);
-    expect(result[1]).toBeCloseTo(1);
+    // Two deviations apart, with nought at the worse of the two: the pool's replacement player.
+    expect(result[0]).toBeCloseTo(0);
+    expect(result[1]).toBeCloseTo(2);
   });
 
   it('weights every active category equally, regardless of any stat weight', () => {
@@ -91,8 +92,8 @@ describe('ProjectionCalculationService.computeZScores', () => {
       new Set<ScoringStatKey>(['goals', 'assists']),
     );
 
-    expect(result[0]).toBeCloseTo(-2);
-    expect(result[1]).toBeCloseTo(2);
+    expect(result[0]).toBeCloseTo(0);
+    expect(result[1]).toBeCloseTo(4);
   });
 
   it('inverts a lower-is-better category so the lower value scores higher', () => {
@@ -101,8 +102,8 @@ describe('ProjectionCalculationService.computeZScores', () => {
       new Set<ScoringStatKey>(['gaa']),
     );
 
-    expect(result[0]).toBeCloseTo(1);
-    expect(result[1]).toBeCloseTo(-1);
+    expect(result[0]).toBeCloseTo(2);
+    expect(result[1]).toBeCloseTo(0);
   });
 
   it('standardizes skater and goalie categories in separate pools', () => {
@@ -116,10 +117,10 @@ describe('ProjectionCalculationService.computeZScores', () => {
       new Set<ScoringStatKey>(['goals', 'w']),
     );
 
-    expect(result[0]).toBeCloseTo(-1);
-    expect(result[1]).toBeCloseTo(1);
-    expect(result[2]).toBeCloseTo(-1);
-    expect(result[3]).toBeCloseTo(1);
+    expect(result[0]).toBeCloseTo(0);
+    expect(result[1]).toBeCloseTo(2);
+    expect(result[2]).toBeCloseTo(0);
+    expect(result[3]).toBeCloseTo(2);
   });
 
   it('ignores inactive categories', () => {
@@ -128,8 +129,8 @@ describe('ProjectionCalculationService.computeZScores', () => {
       new Set<ScoringStatKey>(['goals']),
     );
 
-    expect(result[0]).toBeCloseTo(-1);
-    expect(result[1]).toBeCloseTo(1);
+    expect(result[0]).toBeCloseTo(0);
+    expect(result[1]).toBeCloseTo(2);
   });
 
   it('contributes nothing for a category with no spread', () => {
@@ -140,6 +141,39 @@ describe('ProjectionCalculationService.computeZScores', () => {
 
     expect(result[0]).toEqual(0);
     expect(result[1]).toEqual(0);
+  });
+
+  it('puts nought at the worst player the pool holds, so everyone rostered scores above it', () => {
+    const field = [
+      ...[50, 40, 30, 20, 10].map((goals, index) => skater(index + 1, { goals })),
+      skater(6, { goals: 5 }),
+    ];
+
+    const result = service.computeZScores(field, new Set<ScoringStatKey>(['goals']), 5, 32);
+
+    expect(result[4]).toBeCloseTo(0, 10);
+    expect(result.slice(0, 4).every((score) => score > 0)).toBe(true);
+    // Only a player the pool leaves out, worse than the one a team could pick up, is below it.
+    expect(result[5]).toBeLessThan(0);
+  });
+
+  it('moves nought by one constant, so the breakdown still sums to the total', () => {
+    const field = [
+      skater(1, { goals: 40, assists: 10 }),
+      skater(2, { goals: 10, assists: 45 }),
+      skater(3, { goals: 20, assists: 20 }),
+      skater(4, { goals: 5, assists: 30 }),
+    ];
+    const categories = new Set<ScoringStatKey>(['goals', 'assists']);
+
+    const totals = service.computeZScores(field, categories);
+    const contributions = service.computeZScoreContributions(field, categories);
+
+    expect(Math.min(...totals)).toBeCloseTo(0, 10);
+    contributions.forEach((byCategory, index) => {
+      const sum = Object.values(byCategory).reduce((total, value) => total + value, 0);
+      expect(sum).toBeCloseTo(totals[index], 10);
+    });
   });
 
   it('returns an empty array for no projections', () => {
@@ -196,9 +230,21 @@ describe('ProjectionCalculationService.computeZScores', () => {
 
 describe('ProjectionCalculationService ratio categories', () => {
   let service: ProjectionCalculationService;
+  // A ratio's own value, (rate − pool rate) × volume over the spread, is what these pin down. A
+  // season board then moves nought to its replacement goalie, which an empty line's origin leaves
+  // out: there a ratio is scored as it stands.
+  let ratioScores: (projections: Projection[], categories: Set<ScoringStatKey>) => number[];
+  let ratioContributions: (
+    projections: Projection[],
+    categories: Set<ScoringStatKey>,
+  ) => Record<string, number>[];
 
   beforeEach(() => {
     service = new ProjectionCalculationService();
+    ratioScores = (projections, categories) =>
+      service.computeZScores(projections, categories, 180, 32, 'empty');
+    ratioContributions = (projections, categories) =>
+      service.computeZScoreContributions(projections, categories, 180, 32, 'empty');
   });
 
   // Two goalies with the same good numbers, one playing twice the other's games, and two worse ones
@@ -211,7 +257,7 @@ describe('ProjectionCalculationService ratio categories', () => {
   ];
 
   it('ranks a 60-game goalie above a 30-game goalie with the same GAA and save percentage', () => {
-    const [starter, backup] = service.computeZScores(field(), GOALIE_RATIOS);
+    const [starter, backup] = ratioScores(field(), GOALIE_RATIOS);
 
     expect(backup).toBeGreaterThan(0);
     expect(starter).toBeGreaterThan(backup);
@@ -220,10 +266,7 @@ describe('ProjectionCalculationService ratio categories', () => {
   });
 
   it('ranks a busy below-average goalie below a light one with the same numbers', () => {
-    const scores = service.computeZScores(
-      [...field(), goalieSeason(5, 25, 3.1, 0.898)],
-      GOALIE_RATIOS,
-    );
+    const scores = ratioScores([...field(), goalieSeason(5, 25, 3.1, 0.898)], GOALIE_RATIOS);
 
     expect(scores[2]).toBeLessThan(scores[4]);
     expect(scores[4]).toBeLessThan(0);
@@ -246,7 +289,7 @@ describe('ProjectionCalculationService ratio categories', () => {
   });
 
   it('turns GAA round so the goalie who concedes less scores higher', () => {
-    const contributions = service.computeZScoreContributions(field(), GOALIE_RATIOS);
+    const contributions = ratioContributions(field(), GOALIE_RATIOS);
 
     expect(contributions[0]['gaa']).toBeGreaterThan(0);
     expect(contributions[2]['gaa']).toBeLessThan(0);
@@ -285,10 +328,7 @@ describe('ProjectionCalculationService ratio categories', () => {
   });
 
   it('adds nothing to a ratio for a goalie who never plays', () => {
-    const contributions = service.computeZScoreContributions(
-      [...field(), goalie(5, {}, 0)],
-      GOALIE_RATIOS,
-    );
+    const contributions = ratioContributions([...field(), goalie(5, {}, 0)], GOALIE_RATIOS);
 
     // Before, his GAA of zero was the best in the league.
     expect(contributions[4]['gaa']).toBeCloseTo(0, 10);
@@ -297,7 +337,7 @@ describe('ProjectionCalculationService ratio categories', () => {
 
   it("weighs a rate with no games behind it at the pool's average volume", () => {
     const rateOnly = goalie(5, { gaa: 2.4, svPct: 0.918 }, 0);
-    const scores = service.computeZScores([...field(), rateOnly], GOALIE_RATIOS);
+    const scores = ratioScores([...field(), rateOnly], GOALIE_RATIOS);
 
     expect(scores[4]).toBeGreaterThan(0);
     expect(scores[4]).toBeLessThan(scores[0]);
@@ -306,7 +346,7 @@ describe('ProjectionCalculationService ratio categories', () => {
   it('measures the pool rate by volume rather than as a mean of the rates', () => {
     // Weighted by hours the pool concedes 2.8 a game, where the mean of the three GAAs is 2.6. The
     // goalie who sits at 2.8 is then exactly average, where a mean of the rates would mark him down.
-    const contributions = service.computeZScoreContributions(
+    const contributions = ratioContributions(
       [goalieSeason(1, 60, 3.0, 0.9), goalieSeason(2, 15, 2.0, 0.9), goalieSeason(3, 30, 2.8, 0.9)],
       new Set(['gaa']),
     );
@@ -326,7 +366,7 @@ describe('ProjectionCalculationService ratio categories', () => {
   });
 
   it('weights win percentage by decisions', () => {
-    const scores = service.computeZScores(
+    const scores = ratioScores(
       [
         goalie(1, { w: 36, l: 18, otl: 6, winPct: 0.6 }),
         goalie(2, { w: 18, l: 9, otl: 3, winPct: 0.6 }),
@@ -340,7 +380,7 @@ describe('ProjectionCalculationService ratio categories', () => {
   });
 
   it('weights shooting percentage by shots on goal', () => {
-    const scores = service.computeZScores(
+    const scores = ratioScores(
       [
         skater(1, { goals: 30, sog: 200, shPct: 15 }),
         skater(2, { goals: 6, sog: 40, shPct: 15 }),
@@ -368,8 +408,12 @@ describe('ProjectionCalculationService ratio categories', () => {
       new Set<ScoringStatKey>(['w', 'gaa', 'svPct']),
     );
 
+    // Nought sits at the replacement goalie; the steps between the others are the pool's spread.
     contributions.forEach((byCategory, index) => {
-      expect(byCategory['w']).toBeCloseTo((wins[index] - mean) / stdDev, 10);
+      expect(byCategory['w'] - contributions[0]['w']).toBeCloseTo(
+        (wins[index] - wins[0]) / stdDev,
+        10,
+      );
     });
   });
 });
@@ -404,12 +448,15 @@ describe('ProjectionCalculationService with the nought at an empty line', () => 
   });
 
   it("keeps the pool's order and spread: the two differ by one constant per pool", () => {
-    const fromPool = service.computeZScores(skaters(), GOALS_AND_ASSISTS);
+    const fromReplacement = service.computeZScores(skaters(), GOALS_AND_ASSISTS);
     const fromEmpty = service.computeZScores(skaters(), GOALS_AND_ASSISTS, 180, 32, 'empty');
 
-    const shift = fromEmpty[0] - fromPool[0];
-    expect(shift).toBeGreaterThan(0);
-    fromEmpty.forEach((score, index) => expect(score - fromPool[index]).toBeCloseTo(shift, 10));
+    // The pool here is everyone, so its replacement player is the empty line itself.
+    const shift = fromEmpty[0] - fromReplacement[0];
+    expect(shift).toBeCloseTo(0, 10);
+    fromEmpty.forEach((score, index) =>
+      expect(score - fromReplacement[index]).toBeCloseTo(shift, 10),
+    );
   });
 
   it('takes away for a count where less is better', () => {
@@ -434,10 +481,15 @@ describe('ProjectionCalculationService with the nought at an empty line', () => 
       goalie(4, {}, 0),
     ];
 
-    const fromPool = service.computeZScores(field, GOALIE_RATIOS);
+    const fromReplacement = service.computeZScores(field, GOALIE_RATIOS);
     const fromEmpty = service.computeZScores(field, GOALIE_RATIOS, 180, 32, 'empty');
 
-    fromEmpty.forEach((score, index) => expect(score).toBeCloseTo(fromPool[index], 10));
+    // A season board moves nought to its worst goalie; an empty line's origin moves nothing.
+    const shift = fromEmpty[1] - fromReplacement[1];
+    expect(fromReplacement[1]).toBeCloseTo(0, 10);
+    fromEmpty.forEach((score, index) =>
+      expect(score - fromReplacement[index]).toBeCloseTo(shift, 10),
+    );
     expect(fromEmpty[3]).toBe(0);
     expect(fromEmpty[1]).toBeLessThan(0);
   });

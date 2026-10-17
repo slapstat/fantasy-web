@@ -35,8 +35,8 @@ export interface RankingInput {
    */
   manualRanking?: ManualRanking;
   /**
-   * Where a category league's nought sits (see {@link ZScoreOrigin}). Left out, at the pool's
-   * average, which is what a season board ranks by.
+   * Where a category league's nought sits (see {@link ZScoreOrigin}). Left out, at the
+   * replacement player, which is what a season board ranks by.
    */
   zScoreOrigin?: ZScoreOrigin;
 }
