@@ -567,6 +567,19 @@ describe('PlayerScoutComponent', () => {
     expect(ngMocks.formatText(ngMocks.find(fixture, '.roster-more'))).toBe('Show all 12');
   });
 
+  it('prices the cost to drop in points, or in Z-Score in a category league', async () => {
+    let page = (await render()).point.componentInstance;
+    expect(page.dropCostTip()).toBe(
+      'The total points your team would lose if you dropped this player.',
+    );
+
+    settings = { ...SETTINGS, scoringType: 'category' };
+    page = (await render()).point.componentInstance;
+    expect(page.dropCostTip()).toBe(
+      'The total Z-Score your team would lose if you dropped this player.',
+    );
+  });
+
   it('re-prices the list against the drop picked, from a chip or from the roster, and forgets him with the league', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
