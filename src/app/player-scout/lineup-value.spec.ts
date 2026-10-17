@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { RosterSlots } from '../api/models/roster-slots';
 import { Projection } from '../models/projection.model';
-import { TeamPlayer } from '../services/player-scout.service';
-import { priceDrop, valueLineup } from './lineup-value';
+import { NightWorth, TeamPlayer } from '../services/player-scout.service';
+import { NightWeights, priceDrop, StatShares, statShares, valueLineup } from './lineup-value';
 
 /** Two centre seats, one wing, one defence seat, a goalie seat and a bench. */
 const SLOTS: RosterSlots = { c: 2, lw: 1, rw: 0, w: 0, f: 0, d: 1, util: 0, bn: 2, g: 1 };
@@ -237,5 +237,121 @@ describe('priceDrop', () => {
     expect(priceDrop(goalie, roster, SLOTS, nights, value).gainFor(pickup(['G'], 50))).toBeCloseTo(
       20,
     );
+  });
+});
+
+describe('nights with a worth', () => {
+  // Two defencemen for one defence seat, near enough level: d1 a hair better on the season.
+  const team = [player('d1', ['D'], 'COL'), player('d2', ['D'], 'BOS')];
+  const scores: Record<string, number> = { d1: 50.5, d2: 50 };
+  const score = (id: string) => scores[id] ?? null;
+  const both = schedule({ COL: NIGHTS, BOS: NIGHTS });
+  // Each holds 30 of his score in points, counted from nothing, and nothing in plus-minus.
+  const shares: StatShares = { byStat: { points: 30 }, plusMinus: 0 };
+  const SOFT: NightWorth = { stat: { points: 1.2 }, plusMinusPerMinute: 0 };
+  const STRONG: NightWorth = { stat: { points: 0.85 }, plusMinusPerMinute: 0 };
+  // The third night d1 visits a stingy defence and d2 is at home to a leaky one.
+  const skewed: NightWeights = {
+    worth: new Map([
+      ['COL', new Map([[NIGHTS[2], STRONG]])],
+      ['BOS', new Map([[NIGHTS[2], SOFT]])],
+    ]),
+    shares: () => shares,
+  };
+
+  it('starts the better of a near tie every night when every night is alike', () => {
+    const valuation = valueLineup(team, SLOTS, both, score);
+
+    expect(valuation.byPlayer.get('d1')?.starts).toBe(10);
+    expect(valuation.byPlayer.get('d2')?.starts).toBe(0);
+  });
+
+  it('starts the other of a near tie on the night his opponent is the softer', () => {
+    const valuation = valueLineup(team, SLOTS, both, score, skewed);
+
+    expect(valuation.byPlayer.get('d1')?.starts).toBe(9);
+    expect(valuation.byPlayer.get('d2')?.starts).toBe(1);
+    // d2's night is worth his 5 a game plus 30 / 10 of points at 1.2 over his nights' 1.02.
+    expect(valuation.byPlayer.get('d2')?.value).toBeCloseTo(5 + 3 * (1.2 / 1.02 - 1));
+    // The lineup is better for it than seating d1 every night, which it is worth 50.5.
+    expect(valuation.total).toBeGreaterThan(50.5);
+  });
+
+  it('keeps the better of a near tie on every night when the nights favour neither', () => {
+    const even: NightWeights = {
+      worth: new Map([
+        ['COL', new Map([[NIGHTS[2], SOFT]])],
+        ['BOS', new Map([[NIGHTS[2], SOFT]])],
+      ]),
+      shares: () => shares,
+    };
+
+    expect(valueLineup(team, SLOTS, both, score, even).byPlayer.get('d1')?.starts).toBe(10);
+  });
+
+  it("still adds a player's nights up to his score: the worth only places it", () => {
+    const valuation = valueLineup([team[0]], SLOTS, both, score, skewed);
+
+    expect(valuation.byPlayer.get('d1')?.value).toBeCloseTo(50.5);
+  });
+
+  it("moves plus-minus by the night's amount, not a share of it", () => {
+    // No points to move, only plus-minus: 0.01 a minute of his ice on d2's third night is worth
+    // 400 / 10 of score a unit, less his nights' average amount.
+    const minus: NightWeights = {
+      worth: new Map([['BOS', new Map([[NIGHTS[2], { stat: {}, plusMinusPerMinute: 0.01 }]])]]),
+      shares: () => ({ byStat: {}, plusMinus: 400 }),
+    };
+    const valuation = valueLineup(team, SLOTS, both, score, minus);
+
+    expect(valuation.byPlayer.get('d2')?.starts).toBe(1);
+    expect(valuation.byPlayer.get('d2')?.value).toBeCloseTo(5 + 40 * (0.01 - 0.001));
+  });
+
+  it('counts every night alike for a player whose shares are not known', () => {
+    const unknown: NightWeights = { ...skewed, shares: (id) => (id === 'd1' ? shares : null) };
+
+    // d1 still loses value on the third night; d2, unweighed, is worth 5 then as every night.
+    const valuation = valueLineup(team, SLOTS, both, score, unknown);
+    expect(valuation.byPlayer.get('d2')?.starts).toBe(1);
+    expect(valuation.byPlayer.get('d2')?.value).toBeCloseTo(5);
+  });
+
+  it('prices a near-tie pickup by the nights his opponents are the softer', () => {
+    // Dropping d2 for a pickup level with him on the season but at home to the leaky defence
+    // on the third night: he takes that night from d1, which d2 did as well.
+    const pricing = priceDrop(team[1], team, SLOTS, both, score, skewed);
+    const level = { playerId: 'p', positions: ['D'], teamAbbrev: 'BOS', score: 50 };
+
+    expect(pricing.gainFor({ ...level, shares })).toBeCloseTo(0);
+    // Unweighed he is worth his even 5 on the third night, short of what d2 made of it.
+    expect(pricing.gainFor(level)).toBeLessThan(0);
+  });
+});
+
+describe('statShares', () => {
+  const line = {
+    playerId: 1,
+    type: 'skater',
+    stats: {
+      scoring: { goals: 20, hits: 100, plusMinus: 10 },
+      utility: { gp: 80, toiPerGame: 1200 },
+    },
+  } as unknown as Projection;
+
+  it("holds each stat's count times what one more of it scores", () => {
+    const shares = statShares(line, { skater: { goals: 0.1, hits: 0.02 }, goalie: {} });
+
+    expect(shares.byStat['goals']).toBeCloseTo(2);
+    expect(shares.byStat['hits']).toBeCloseTo(2);
+    expect(shares.plusMinus).toBe(0);
+  });
+
+  it('weighs plus-minus over his games and minutes, since a night moves it by an amount', () => {
+    const shares = statShares(line, { skater: { plusMinus: 0.1 }, goalie: {} });
+
+    expect(shares.byStat['plusMinus']).toBeUndefined();
+    // 0.1 a unit, over 80 games of 20 minutes.
+    expect(shares.plusMinus).toBeCloseTo(0.1 * 80 * 20);
   });
 });

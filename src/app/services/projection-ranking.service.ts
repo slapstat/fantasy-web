@@ -1,5 +1,9 @@
 import { inject, Injectable } from '@angular/core';
-import { ProjectionCalculationService, ZScoreOrigin } from './projection-calculation.service';
+import {
+  ProjectionCalculationService,
+  ZScoreOrigin,
+  ZScoreScales,
+} from './projection-calculation.service';
 import { Projection, ScoredProjection, ScoringType, StatWeights } from '../models/projection.model';
 import {
   GOALIE_SCORING_STAT_KEYS,
@@ -12,6 +16,9 @@ import { applyManualRanking, ManualRanking, PROJECTED_RANKING } from '../models/
 
 const SKATER_SCORING_STAT_KEY_SET: ReadonlySet<string> = new Set(SKATER_SCORING_STAT_KEYS);
 const GOALIE_SCORING_STAT_KEY_SET: ReadonlySet<string> = new Set(GOALIE_SCORING_STAT_KEYS);
+
+/** Per scored stat, what one more of it adds to a score: skaters' and goalies' apart. */
+export type ScoreUnits = ZScoreScales;
 
 export interface RankingInput {
   projections: Projection[];
@@ -105,6 +112,35 @@ export class ProjectionRankingService {
       byPlayerId.set(projection.playerId, zContributions[index]);
     });
     return byPlayerId;
+  }
+
+  /**
+   * What one more of each scored stat adds to a player's score, skaters' and goalies' apart: its
+   * weight in a points league, its direction over the pool's spread in a category league (see
+   * {@link ProjectionCalculationService.computeZScoreScales}). A ratio category has none. Scores are
+   * linear in a player's counts, so a caller can price a change to his line, a night that moves
+   * his goals by a tenth say, without ranking the pool again.
+   */
+  scoreUnits(input: RankingInput): ScoreUnits {
+    if (input.scoringType === 'points') {
+      const units = (keys: ReadonlySet<string>) =>
+        Object.fromEntries(
+          Object.entries(input.statWeights).filter(
+            ([key]) => keys.has(key) && input.activeScoringColumns.has(key as ScoringStatKey),
+          ),
+        );
+      return {
+        skater: units(SKATER_SCORING_STAT_KEY_SET),
+        goalie: units(GOALIE_SCORING_STAT_KEY_SET),
+      };
+    }
+    const roster = input.rosterSlots;
+    return this.calculation.computeZScoreScales(
+      input.projections.map((projection) => this.round(projection, input.decimalSettings)),
+      input.activeScoringColumns,
+      input.leagueSize * skaterSlotCount(roster),
+      input.leagueSize * roster.g,
+    );
   }
 
   private score(input: RankingInput): ScoredProjection[] {

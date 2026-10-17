@@ -4,6 +4,7 @@ import { Api } from '../api/api';
 import { playerScoutMyTeam } from '../api/fn/player-scout/player-scout-my-team';
 import { playerScoutPlayers } from '../api/fn/player-scout/player-scout-players';
 import { PlayerScoutRow } from '../api/models/player-scout-row';
+import { PlayerScoutTeamResponse } from '../api/models/player-scout-team-response';
 import { ScoutLine } from '../api/models/scout-line';
 import { ScoutMyTeamResponse } from '../api/models/scout-my-team-response';
 import { ScoutRosterPlayer } from '../api/models/scout-roster-player';
@@ -100,10 +101,20 @@ export interface ScoutTeam {
   readonly players: readonly TeamPlayer[];
 }
 
+/** What one of a club's nights is worth to a player's line, against an average night. */
+export interface NightWorth {
+  /** Per stat key, the night's worth to the stat: 1.1 is 10% more. A stat not listed is average. */
+  readonly stat: Readonly<Record<string, number>>;
+  /** What the night adds to his plus-minus per minute of his ice, an amount rather than a share. */
+  readonly plusMinusPerMinute: number;
+}
+
 /** The user's team and every club's remaining nights, keyed by the NHL's spelling of the club. */
 export interface ScoutTeamAnswer {
   readonly team: ScoutTeam;
   readonly schedule: ReadonlyMap<string, readonly string[]>;
+  /** What each of those nights is worth to a player's line, by club then date. */
+  readonly worth: ReadonlyMap<string, ReadonlyMap<string, NightWorth>>;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -142,9 +153,46 @@ export class PlayerScoutService {
             return key ? [[key, club.dates] as const] : [];
           }),
         ),
+        worth: nightWorths(answer),
       })),
     );
   }
+}
+
+/**
+ * Every club's nights' worth: each game's opponent and venue looked up in what the server rates a
+ * game against that opponent at that venue. A game the table has no row for is left out, which
+ * the lineup reads as an average night.
+ */
+export function nightWorths(
+  answer: PlayerScoutTeamResponse,
+): ReadonlyMap<string, ReadonlyMap<string, NightWorth>> {
+  const pairings = new Map(
+    answer.opponentWorth.map((row) => [
+      pairing(row.opponent, row.home),
+      { stat: row.statWorth, plusMinusPerMinute: row.plusMinusPerMinute },
+    ]),
+  );
+  const byClub = new Map<string, ReadonlyMap<string, NightWorth>>();
+  for (const club of answer.schedule) {
+    const key = nhlTeamKey(club.team);
+    if (!key) {
+      continue;
+    }
+    const nights = new Map<string, NightWorth>();
+    for (const game of club.games) {
+      const worth = game.opponent ? pairings.get(pairing(game.opponent, game.home)) : undefined;
+      if (worth) {
+        nights.set(game.date, worth);
+      }
+    }
+    byClub.set(key, nights);
+  }
+  return byClub;
+}
+
+function pairing(opponent: string, home: boolean): string {
+  return `${opponent}|${home ? 'home' : 'away'}`;
 }
 
 /**

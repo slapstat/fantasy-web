@@ -149,6 +149,7 @@ function team(): ScoutTeamAnswer {
       ['EDM', NIGHTS],
       ['SEA', NIGHTS],
     ]),
+    worth: new Map(),
   };
 }
 
@@ -626,6 +627,7 @@ describe('PlayerScoutComponent', () => {
           ['EDM', NIGHTS],
           ['SEA', NIGHTS],
         ]),
+        worth: new Map(),
       }),
     );
     players.mockReturnValue(
@@ -655,6 +657,47 @@ describe('PlayerScoutComponent', () => {
     page.pickDrop('404');
     expect(page.gains()?.get('99')).toBeCloseTo(30);
     expect(page.gains()?.get('98')).toBeCloseTo(-20);
+  });
+
+  it('starts the other of two near-equal defencemen on the night his opponent is the softer', async () => {
+    settings = {
+      ...SETTINGS,
+      rosterSlots: { c: 0, lw: 0, rw: 0, w: 0, f: 0, d: 1, g: 0, util: 0, bn: 1 },
+    };
+    // 501 is two points better on the season than 502, which every night alike starts him on.
+    const better = skater(501, 10, 21);
+    const level = skater(502, 10, 20);
+    const soft = { stat: { goals: 1.3, assists: 1.3 }, plusMinusPerMinute: 0 };
+    const stingy = { stat: { goals: 0.8, assists: 0.8 }, plusMinusPerMinute: 0 };
+    myTeam.mockReturnValue(
+      of({
+        team: {
+          found: true,
+          teamName: 'Slapshots',
+          players: [teamPlayer(better, ['D']), { ...teamPlayer(level, ['D']), teamAbbrev: 'SEA' }],
+        },
+        schedule: new Map([
+          ['EDM', NIGHTS],
+          ['SEA', NIGHTS],
+        ]),
+        // The third night Edmonton visit a stingy defence and Seattle host a leaky one.
+        worth: new Map([
+          ['EDM', new Map([[NIGHTS[2], stingy]])],
+          ['SEA', new Map([[NIGHTS[2], soft]])],
+        ]),
+      }),
+    );
+    players.mockReturnValue(
+      of({
+        ...league(),
+        players: [scoutPlayer(better, better, ['D'], MINE), scoutPlayer(level, level, ['D'], MINE)],
+      }),
+    );
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+
+    expect(page.valuation()?.byPlayer.get('501')?.starts).toBe(9);
+    expect(page.valuation()?.byPlayer.get('502')?.starts).toBe(1);
   });
 
   it('sorts the whole list by the gain, not the page, and offers the column only with a drop', async () => {
@@ -733,7 +776,11 @@ describe('PlayerScoutComponent', () => {
 
   it('prices no pickup while the team is not his', async () => {
     myTeam.mockReturnValue(
-      of({ team: { found: false, teamName: null, players: [] }, schedule: new Map() }),
+      of({
+        team: { found: false, teamName: null, players: [] },
+        schedule: new Map(),
+        worth: new Map(),
+      }),
     );
     const fixture = await render();
     const page = fixture.point.componentInstance;

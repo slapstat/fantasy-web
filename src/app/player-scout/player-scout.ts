@@ -17,7 +17,7 @@ import { ScoringStatKey } from '../models/stat-key.model';
 import { EspnService } from '../services/espn.service';
 import { ChosenLeague, LeagueChoiceService } from '../services/league-choice.service';
 import { PlayerScoutService, ScoutSince, TeamPlayer } from '../services/player-scout.service';
-import { ProjectionRankingService } from '../services/projection-ranking.service';
+import { ProjectionRankingService, ScoreUnits } from '../services/projection-ranking.service';
 import { YahooService } from '../services/yahoo.service';
 import { ErrorStateComponent } from '../shared/error-state/error-state';
 import { IconComponent } from '../shared/icon/icon';
@@ -35,7 +35,14 @@ import {
   PLANNER_POSITIONS,
 } from '../streamer-planner/planner-free-agents';
 import { TeamRoom, teamRoom } from './drop-candidates';
-import { LineupValue, priceDrop, valueLineup } from './lineup-value';
+import {
+  EVEN_NIGHTS,
+  LineupValue,
+  NightWeights,
+  priceDrop,
+  statShares,
+  valueLineup,
+} from './lineup-value';
 import {
   nextScoutSort,
   rankScout,
@@ -426,22 +433,36 @@ export class PlayerScoutComponent {
   /** Ranks lines by the league's scoring, best first, and the score each is ranked by. */
   private readonly ranker = computed(() => {
     const scoring = this.scoring();
+    const input = (projections: Projection[]) => ({
+      projections,
+      scoringType: scoring.scoringType,
+      statWeights: scoring.statWeights,
+      activeScoringColumns: scoring.activeScoringColumns,
+      leagueSize: DEFAULT_LEAGUE_SIZE,
+      rosterSlots: DEFAULT_ROSTER_SLOTS,
+      // A goalie on the wire is rarely anyone's starter, and the season minimum is there to keep
+      // a backup off a season table. Applied here it would rank most of them out of the list.
+      minGoalieGames: 0,
+      decimalSettings: DEFAULT_DECIMAL_SETTINGS,
+    });
     const rank = (projections: Projection[]): ScoredProjection[] =>
-      this.ranking.rankOverall({
-        projections,
-        scoringType: scoring.scoringType,
-        statWeights: scoring.statWeights,
-        activeScoringColumns: scoring.activeScoringColumns,
-        leagueSize: DEFAULT_LEAGUE_SIZE,
-        rosterSlots: DEFAULT_ROSTER_SLOTS,
-        // A goalie on the wire is rarely anyone's starter, and the season minimum is there to keep
-        // a backup off a season table. Applied here it would rank most of them out of the list.
-        minGoalieGames: 0,
-        decimalSettings: DEFAULT_DECIMAL_SETTINGS,
-      });
+      this.ranking.rankOverall(input(projections));
+    const units = (projections: Projection[]): ScoreUnits =>
+      this.ranking.scoreUnits(input(projections));
     const scoreOf = (entry: ScoredProjection) =>
       scoring.scoringType === 'points' ? entry.score.fantasyPoints : entry.score.zScore;
-    return { rank, scoreOf };
+    return { rank, units, scoreOf };
+  });
+
+  /**
+   * What one more of each scored stat adds to a score over today's lines, so a night that moves a
+   * player's goals or hits can be priced in the same score he is ranked by.
+   */
+  private readonly units = computed<ScoreUnits | null>(() => {
+    const list = this.list();
+    return list
+      ? this.ranker().units(list.players.map((player) => player.freeAgent.projection))
+      : null;
   });
 
   /** Every player in the league, skaters and goalies, best first on the rest of the season. */
@@ -591,6 +612,23 @@ export class PlayerScoutComponent {
     return (playerId: string) => scores.get(playerId)?.score ?? null;
   });
 
+  /** Every club's nights' worth, and how much of each of the user's players they move. */
+  private readonly nightWeights = computed<NightWeights>(() => {
+    const answer = this.teamResource.hasValue() ? this.teamResource.value() : null;
+    const units = this.units();
+    if (!answer || !units) {
+      return EVEN_NIGHTS;
+    }
+    const scores = this.ownScores();
+    return {
+      worth: answer.worth,
+      shares: (playerId) => {
+        const row = scores.get(playerId);
+        return row ? statShares(row.line, units) : null;
+      },
+    };
+  });
+
   /** The roster weighed night by night over the rest of the season; null while anything is missing. */
   readonly valuation = computed(() => {
     const team = this.team();
@@ -599,7 +637,7 @@ export class PlayerScoutComponent {
     if (!team || !slots || schedule.size === 0) {
       return null;
     }
-    return valueLineup(team, slots, schedule, this.scoreOfOwn());
+    return valueLineup(team, slots, schedule, this.scoreOfOwn(), this.nightWeights());
   });
 
   /** Room for a pickup with nobody dropped: open roster spots, injured players to move to IR. */
@@ -931,7 +969,9 @@ export class PlayerScoutComponent {
     if (pickups.length === 0) {
       return null;
     }
-    const pricing = priceDrop(drop.player, team, slots, schedule, this.scoreOfOwn());
+    const weights = this.nightWeights();
+    const units = this.units();
+    const pricing = priceDrop(drop.player, team, slots, schedule, this.scoreOfOwn(), weights);
     const gains = new Map<string, number | null>();
     for (const row of pickups) {
       gains.set(
@@ -941,6 +981,7 @@ export class PlayerScoutComponent {
           positions: row.player.positions,
           teamAbbrev: row.player.teamAbbrev,
           score: row.score,
+          shares: units ? statShares(row.line, units) : undefined,
         }),
       );
     }

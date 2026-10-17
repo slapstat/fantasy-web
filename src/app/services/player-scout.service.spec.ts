@@ -189,8 +189,23 @@ describe('PlayerScoutService', () => {
         },
       ],
       schedule: [
-        { team: 'COL', dates: ['2026-10-15', '2026-10-17'] },
-        { team: 'TB', dates: ['2026-10-16'] },
+        {
+          team: 'COL',
+          dates: ['2026-10-15', '2026-10-17'],
+          games: [
+            { date: '2026-10-15', opponent: 'TBL', home: true },
+            { date: '2026-10-17', opponent: 'SEA', home: false },
+          ],
+        },
+        {
+          team: 'TB',
+          dates: ['2026-10-16'],
+          games: [{ date: '2026-10-16', opponent: 'COL', home: false }],
+        },
+      ],
+      opponentWorth: [
+        { opponent: 'TBL', home: true, statWorth: { points: 1.08 }, plusMinusPerMinute: 0.002 },
+        { opponent: 'COL', home: true, statWorth: { points: 0.9 }, plusMinusPerMinute: -0.003 },
       ],
     });
 
@@ -217,5 +232,13 @@ describe('PlayerScoutService', () => {
     expect(answer.schedule.get('COL')).toEqual(['2026-10-15', '2026-10-17']);
     // A platform's spelling of a club is folded to the NHL's.
     expect(answer.schedule.get('TBL')).toEqual(['2026-10-16']);
+    // Each night's worth is its opponent's at its venue: at home to Tampa Bay, and nothing known
+    // of a night in Seattle or of Tampa Bay's road game, which the lineup reads as average.
+    expect(answer.worth.get('COL')?.get('2026-10-15')).toEqual({
+      stat: { points: 1.08 },
+      plusMinusPerMinute: 0.002,
+    });
+    expect(answer.worth.get('COL')?.has('2026-10-17')).toBe(false);
+    expect(answer.worth.get('TBL')?.size).toBe(0);
   });
 });
