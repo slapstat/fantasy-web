@@ -253,13 +253,7 @@
                           >
                             Starts/Games left
                           </th>
-                          <th
-                            scope="col"
-                            class="num"
-                            appTooltip="The total points your team would lose if you dropped this player."
-                          >
-                            Cost to drop
-                          </th>
+                          <th scope="col" class="num" [appTooltip]="dropCostTip()">Cost to drop</th>
                         }
                       </tr>
                     </thead>

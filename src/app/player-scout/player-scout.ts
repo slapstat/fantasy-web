@@ -362,6 +362,12 @@ export class PlayerScoutComponent {
       : 'Projected Z-Score for the rest of the season.',
   );
 
+  readonly dropCostTip = computed(() =>
+    this.scoringType() === 'points'
+      ? 'The total points your team would lose if you dropped this player.'
+      : 'The total Z-Score your team would lose if you dropped this player.',
+  );
+
   readonly categories = computed<readonly ScoringStatKey[]>(() => [
     ...this.scoring().activeScoringColumns,
   ]);
