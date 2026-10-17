@@ -5613,9 +5613,64 @@ components:
           items:
             type: string
             format: date
+        games:
+          type: array
+          description: "The same games with who each is against and where, earliest\
+            \ first"
+          items:
+            $ref: "#/components/schemas/ClubNight"
       required:
       - dates
+      - games
       - team
+    ClubNight:
+      type: object
+      description: "One of an NHL club's remaining games: the date, the opponent and\
+        \ the venue"
+      properties:
+        date:
+          type: string
+          format: date
+        opponent:
+          type: string
+          description: The opponent's NHL abbreviation; absent where the schedule
+            names none
+        home:
+          type: boolean
+          description: The club plays at home
+      required:
+      - date
+      - home
+    OpponentWorth:
+      type: object
+      description: "What a game against an opponent, at home or away, is worth to\
+        \ a player's line against an average night, as projection-service rates it\
+        \ today"
+      properties:
+        opponent:
+          type: string
+          description: The opponent's NHL abbreviation
+        home:
+          type: boolean
+          description: "The player's club plays at home, the opponent away"
+        statWorth:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+          description: "What the game is worth to each stat against an average night:\
+            \ 1.1 is 10% more. Keyed by the players' stat keys; a stat not listed\
+            \ is worth an average night"
+        plusMinusPerMinute:
+          type: number
+          format: double
+          description: "What the game adds to a player's plus-minus per minute of\
+            \ his ice, which moves by an amount rather than a share"
+      required:
+      - home
+      - opponent
+      - plusMinusPerMinute
+      - statWorth
     PlayerScoutTeamResponse:
       type: object
       description: "The user's own team with the model's rest of the season, and the\
@@ -5640,8 +5695,17 @@ components:
             \ in the player pool's spelling of the club"
           items:
             $ref: "#/components/schemas/ClubGames"
+        opponentWorth:
+          type: array
+          description: "What a game against each opponent at each venue is worth to\
+            \ a player's line, so the client can weigh each of his nights rather than\
+            \ count them all alike. A game against an opponent not listed is an average\
+            \ night"
+          items:
+            $ref: "#/components/schemas/OpponentWorth"
       required:
       - found
+      - opponentWorth
       - players
       - schedule
     RosteredPlayersResponse:

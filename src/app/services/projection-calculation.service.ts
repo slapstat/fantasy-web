@@ -50,6 +50,18 @@ interface PoolEntry<P extends Projection> {
 interface PoolZScores {
   totals: Float64Array;
   byCategory: (Float64Array | null)[];
+  /**
+   * Per category, what one more of a counting stat adds to a player's z-score: its direction over
+   * the pool's spread. Null for a ratio, whose z-score is not a multiple of any one count, and for a
+   * category with no spread.
+   */
+  scales: (number | null)[];
+}
+
+/** Per counting category, what one more of the stat adds to a z-score, for skaters and goalies apart. */
+export interface ZScoreScales {
+  readonly skater: Readonly<Record<string, number>>;
+  readonly goalie: Readonly<Record<string, number>>;
 }
 
 /**
@@ -181,10 +193,38 @@ export class ProjectionCalculationService {
   }
 
   /**
+   * Per active counting category, what one more of the stat adds to a player's z-score over the
+   * same pool {@link computeZScores} settles on: its direction over the pool's spread. A z-score is
+   * linear in a player's own counts, so this is what lets a caller price a night that moves his
+   * counts without ranking the pool again. A ratio has none: its z-score turns on a rate and the
+   * volume behind it together, and a night's worth moves neither.
+   */
+  computeZScoreScales(
+    projections: Projection[],
+    activeScoringColumns: Set<ScoringStatKey>,
+    skaterPoolSize: number = DEFAULT_SKATER_POOL_SIZE,
+    goaliePoolSize: number = DEFAULT_GOALIE_POOL_SIZE,
+  ): ZScoreScales {
+    const scales = { skater: {}, goalie: {} };
+    this.scorePools(
+      projections,
+      activeScoringColumns,
+      skaterPoolSize,
+      goaliePoolSize,
+      'pool',
+      projections.map(() => 0),
+      null,
+      scales,
+    );
+    return scales;
+  }
+
+  /**
    * Skaters and goalies are ranked against their own pool, so each is scored separately and the
    * results written back at the projection's own index. `contributionsByIndex` is filled in only
    * when a caller asked for the per-category breakdown — the ranking itself needs the totals, and
-   * building a record per player is the more expensive half of the job.
+   * building a record per player is the more expensive half of the job. `scales`, likewise, only
+   * when asked for.
    */
   private scorePools(
     projections: Projection[],
@@ -194,6 +234,7 @@ export class ProjectionCalculationService {
     origin: ZScoreOrigin,
     totalsByIndex: number[],
     contributionsByIndex: Record<string, number>[] | null,
+    scales: { skater: Record<string, number>; goalie: Record<string, number> } | null = null,
   ): void {
     const skaters: PoolEntry<SkaterProjection>[] = [];
     const goalies: PoolEntry<GoalieProjection>[] = [];
@@ -214,6 +255,7 @@ export class ProjectionCalculationService {
       origin,
       totalsByIndex,
       contributionsByIndex,
+      scales?.skater ?? null,
     );
     this.applyPoolZScores(
       goalies,
@@ -224,6 +266,7 @@ export class ProjectionCalculationService {
       origin,
       totalsByIndex,
       contributionsByIndex,
+      scales?.goalie ?? null,
     );
   }
 
@@ -236,6 +279,7 @@ export class ProjectionCalculationService {
     origin: ZScoreOrigin,
     totalsByIndex: number[],
     contributionsByIndex: Record<string, number>[] | null,
+    scales: Record<string, number> | null,
   ): void {
     if (entries.length === 0) {
       return;
@@ -277,6 +321,14 @@ export class ProjectionCalculationService {
     entries.forEach((entry, position) => {
       totalsByIndex[entry.index] = zScores.totals[position];
     });
+    if (scales) {
+      activeKeys.forEach((key, category) => {
+        const scale = zScores.scales[category];
+        if (scale !== null) {
+          scales[key] = scale;
+        }
+      });
+    }
     if (!contributionsByIndex) {
       return;
     }
@@ -304,8 +356,9 @@ export class ProjectionCalculationService {
   ): PoolZScores {
     const totals = new Float64Array(size);
     const byCategory: (Float64Array | null)[] = categories.map(() => null);
+    const scales: (number | null)[] = categories.map(() => null);
     if (poolPositions.length === 0) {
-      return { totals, byCategory };
+      return { totals, byCategory, scales };
     }
 
     categories.forEach((category, index) => {
@@ -339,9 +392,12 @@ export class ProjectionCalculationService {
         totals[position] += zScore;
       }
       byCategory[index] = categoryZScores;
+      if (!category.volumes) {
+        scales[index] = direction / stdDev;
+      }
     });
 
-    return { totals, byCategory };
+    return { totals, byCategory, scales };
   }
 
   /**

@@ -110,6 +110,22 @@ describe('ProjectionRankingService', () => {
         expect(sum).toBeCloseTo(scored.score.zScore, 10);
       }
     });
+
+    it('prices one more win at the z-score it adds over the same pool, and a ratio at nothing', () => {
+      const service = getService();
+      const rankingInput = input('category', categories);
+
+      const units = service.scoreUnits(rankingInput);
+      const contributions = service.contributionsByPlayerId(rankingInput);
+
+      // A count's z-score is linear in it: six wins apart is six units apart.
+      const starter = contributions.get(STARTER.playerId)!['w'];
+      const third = contributions.get(3)!['w'];
+      expect(starter - third).toBeCloseTo(6 * units.goalie['w'], 10);
+      expect(units.goalie['w']).toBeGreaterThan(0);
+      expect(Object.keys(units.goalie)).toEqual(['w']);
+      expect(units.skater).toEqual({});
+    });
   });
 
   describe('in a points league', () => {
@@ -125,6 +141,13 @@ describe('ProjectionRankingService', () => {
       expect(byId.get(STARTER.playerId)!.score.fantasyPoints).toBeCloseTo(expected, 10);
       expect(byId.get(BACKUP.playerId)!.score.fantasyPoints).toBeCloseTo(expected, 10);
       expect(contributions.get(STARTER.playerId)).toEqual(contributions.get(BACKUP.playerId));
+    });
+
+    it('prices one more of a stat at its weight, for the kind of player who scores it', () => {
+      const units = getService().scoreUnits(input('points', ['w', 'gaa']));
+
+      expect(units.goalie).toEqual({ w: DEFAULT_STAT_WEIGHTS['w'], gaa: -2 });
+      expect(units.skater).toEqual({});
     });
   });
 });
