@@ -525,9 +525,11 @@ describe('PlayerScoutComponent', () => {
     ngMocks.click(toggle);
     fixture.detectChanges();
     expect(page.rosterOpen()).toBe(true);
+    expect(ngMocks.formatText(toggle)).toBe('Show less');
     ngMocks.click(toggle);
     fixture.detectChanges();
     expect(page.rosterOpen()).toBe(false);
+    expect(ngMocks.formatText(toggle)).toBe('Show all (12)');
   });
 
   it('unfolds the whole roster, none chosen, and narrows it to the few a drop would be on request', async () => {
