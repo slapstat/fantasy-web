@@ -1244,8 +1244,8 @@ describe('ProjectionCreateComponent', () => {
     expect(navigate).toHaveBeenCalledWith(['/projections', created.id]);
   });
 
-  /** The two AI presets share a name's worth of words, so each says which season it covers. */
-  it('says under each AI preset which part of the season it is', async () => {
+  /** The names say it: "AI Projection" and "AI Rest of Season" need no line under them. */
+  it('puts no line under a preset name', async () => {
     const fixture = MockRender(ProjectionCreateComponent);
     await fixture.whenStable();
     fixture.detectChanges();
@@ -1253,7 +1253,7 @@ describe('ProjectionCreateComponent', () => {
     const metas = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('.row-meta'),
     ).map((element) => element.textContent?.trim());
-    expect(metas).toEqual(['The whole season', 'Only the games left to play']);
+    expect(metas).toEqual([]);
   });
 
   it("asks the server for the model's lines when the AI preset is picked", async () => {
