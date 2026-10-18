@@ -19,24 +19,35 @@ import { lineupSeats, Seat, seating } from '../streamer-planner/planner-lineup';
  * by how much, stat by stat ({@link NightWeights}). So the lineup is set on each night's own worth:
  * of two near-equal defencemen the one facing the softer opponent starts, and the better of the
  * two no longer takes every night they share.
+ *
+ * <p>A manager who streams holds a spot or two for players picked up for a few nights of good
+ * schedule ({@link Streaming}). Such a player is not part of the season's lineup: he is a spot,
+ * which each night seats a free agent who plays then, so an open seat is worth what a streamer
+ * would score in it, and a player who plays on a quiet night leaves the busy night's seat to the
+ * spot.
  */
 export interface LineupValue {
   readonly playerId: string;
-  /** Nights he starts in the lineup over the rest of the season, with the best lineup set each night. */
+  /** Nights he starts in the lineup over the rest of the season, with the best lineup set each
+   * night; none for a streamer, who is a spot rather than a seat. */
   readonly starts: number;
   /** Nights his club plays that he could play: those after his return when out, and the club's
-   * schedule known. */
+   * schedule known. None for a streamer. */
   readonly games: number;
   /** His value over the nights he starts: what a game of his is worth on each, summed. */
   readonly value: number;
   /** What the lineup loses without him: the team's value with him less without, which is less
-   * than his own value where another player would start in his place. */
+   * than his own value where another player would start in his place. For a streamer, what his
+   * spot fills over the rest of the season. */
   readonly marginal: number;
+  /** Held as a streamer: out of the season's lineup, and one streaming spot. */
+  readonly streamer: boolean;
 }
 
 /** The whole roster weighed night by night. */
 export interface LineupValuation {
-  /** The team's value over the rest of the season: every night's starters' value a game, summed. */
+  /** The team's value over the rest of the season: every night's starters' value a game, the
+   * streaming spots' fills among them, summed. */
   readonly total: number;
   readonly byPlayer: ReadonlyMap<string, LineupValue>;
 }
@@ -108,6 +119,79 @@ export interface Pickup {
   readonly score: number;
   /** How much of that score each stat holds; left out, his nights count alike. */
   readonly shares?: StatShares;
+}
+
+/**
+ * Which free agent at a position a streaming spot is counted at on a night: the third best whose
+ * club plays. Not the best, since the league's other managers stream too and nobody lands every
+ * night's top add; the deeper the pool that night, the better its third best, so a busy night's
+ * spot is worth more than a quiet night's.
+ */
+export const STREAM_RANK = 3;
+
+/**
+ * The spots a manager holds for streamers, and the free agents they are filled from. Each player
+ * held as a streamer is one spot, and leaves the season's lineup: on every night a spot seats a
+ * free agent who plays then, at his worth that night, in a seat no better player of the user's
+ * takes. A player on injured reserve takes a spot back once he returns, since he needs a roster
+ * spot again, and the streaming spot is the one a manager gives up.
+ */
+export interface Streaming {
+  /** The user's players held as streamers, by platform id. */
+  readonly streamers: ReadonlySet<string>;
+  /** The free agents a spot is filled from, each read as a pickup is. */
+  readonly freeAgents: readonly Pickup[];
+}
+
+/** No spot held for streamers: the season's lineup is the whole roster, an open seat worth nothing. */
+export const NO_STREAMING: Streaming = { streamers: new Set(), freeAgents: [] };
+
+/** A free agent a spot could seat on a night: one of his positions, and his worth that night. */
+interface Fill {
+  readonly positions: readonly string[];
+  readonly worth: number;
+}
+
+/** The streaming spots as the nights seat them. */
+interface Streams {
+  /** The spots held: one per streamer. */
+  readonly held: number;
+  /** Each player on injured reserve's first night back, by platform id: he takes a spot then. */
+  readonly returns: ReadonlyMap<string, string>;
+  /** Each night's fills, best first: per position, the {@link STREAM_RANK}th best and on. */
+  readonly fills: ReadonlyMap<string, readonly Fill[]>;
+}
+
+const NO_STREAMS: Streams = { held: 0, returns: new Map(), fills: new Map() };
+
+/** The spots a night has: those held, less one for each player back from injured reserve by then. */
+function spotsOn(streams: Streams, date: string): number {
+  let back = 0;
+  for (const night of streams.returns.values()) {
+    if (night <= date) {
+      back += 1;
+    }
+  }
+  return Math.max(0, streams.held - back);
+}
+
+/** The same spots with one player gone, and the spot he would have taken back with him. */
+function withoutReturn(streams: Streams, playerId: string): Streams {
+  if (streams.held === 0 || !streams.returns.has(playerId)) {
+    return streams;
+  }
+  const returns = new Map(streams.returns);
+  returns.delete(playerId);
+  return { ...streams, returns };
+}
+
+/** The players held as streamers: those marked who hold a roster spot. */
+function streamersOf(team: readonly TeamPlayer[], streaming: Streaming): ReadonlySet<string> {
+  return new Set(
+    team
+      .filter((player) => !player.reserve && streaming.streamers.has(player.playerId))
+      .map((player) => player.playerId),
+  );
 }
 
 function clubNights(
@@ -214,34 +298,119 @@ function allNights(schedule: ReadonlyMap<string, readonly string[]>): string[] {
 }
 
 /**
+ * The streaming spots over the rest of the season: as many as the streamers held, each night's
+ * free agents a spot could seat, and when the players on injured reserve take spots back. A spot
+ * is counted at the {@link STREAM_RANK}th best free agent at a position that night, the next spot
+ * at the one after him, and a free agent worth nothing that night fills nothing.
+ */
+function streams(
+  team: readonly TeamPlayer[],
+  held: number,
+  freeAgents: readonly Pickup[],
+  schedule: ReadonlyMap<string, readonly string[]>,
+  weights: NightWeights,
+): Streams {
+  if (held === 0) {
+    return NO_STREAMS;
+  }
+  const byNight = new Map<string, Map<string, number[]>>();
+  for (const agent of freeAgents) {
+    const worth = nightly(
+      agent.score,
+      clubNights(agent.teamAbbrev, schedule),
+      weights.worth.get(nhlTeamKey(agent.teamAbbrev) ?? ''),
+      agent.shares ?? null,
+    );
+    for (const [date, value] of worth) {
+      const positions = byNight.get(date) ?? new Map<string, number[]>();
+      byNight.set(date, positions);
+      for (const position of agent.positions) {
+        const values = positions.get(position);
+        if (values) {
+          values.push(value);
+        } else {
+          positions.set(position, [value]);
+        }
+      }
+    }
+  }
+  const fills = new Map<string, readonly Fill[]>();
+  for (const [date, positions] of byNight) {
+    const tonight: Fill[] = [];
+    for (const [position, values] of positions) {
+      values.sort((a, b) => b - a);
+      values
+        .slice(STREAM_RANK - 1, STREAM_RANK - 1 + held)
+        .filter((value) => value > 0)
+        .forEach((worth) => tonight.push({ positions: [position], worth }));
+    }
+    tonight.sort((a, b) => b.worth - a.worth);
+    fills.set(date, tonight);
+  }
+  const returns = new Map<string, string>();
+  for (const player of team.filter((member) => member.reserve)) {
+    const back = [...nightsBack(player, clubNights(player.teamAbbrev, schedule))];
+    back.sort((a, b) => a.localeCompare(b));
+    if (back.length > 0) {
+      returns.set(player.playerId, back[0]);
+    }
+  }
+  return { held, returns, fills };
+}
+
+/** The same spots, one fewer: the lineup once a streamer's spot holds somebody for the season. */
+function oneFewer(streams: Streams): Streams {
+  return { ...streams, held: Math.max(0, streams.held - 1) };
+}
+
+/**
  * One night's starters: the players with a game, seated best first on what a game of each is
  * worth that night, so when more of a kind play than the lineup seats the best of them that night
- * start. Returns who starts and what they are worth.
+ * start. The streaming spots the night has seat free agents among them, best first as well: into
+ * a seat nobody of the user's takes, or one taken by a player of his worth less that night, who is
+ * then benched. Returns who starts and what the lineup is worth, the spots' fills among it.
  */
 function night(
   players: readonly Seatable[],
   date: string,
   seats: readonly Seat[],
+  streams: Streams = NO_STREAMS,
 ): { readonly starters: readonly Seatable[]; readonly value: number } {
-  const playing = players
-    .filter((player) => player.nights.has(date))
-    .sort((a, b) => worthOn(b, date) - worthOn(a, date));
+  const spots = spotsOn(streams, date);
+  // The user's own listed ahead of a fill worth the same, as the sort keeps them.
+  const order = [
+    ...players
+      .filter((player) => player.nights.has(date))
+      .map((player) => ({ player, positions: player.positions, worth: worthOn(player, date) })),
+    ...(spots > 0 ? (streams.fills.get(date) ?? []) : []).map((fill) => ({
+      player: null,
+      ...fill,
+    })),
+  ].sort((a, b) => b.worth - a.worth);
   const starters: Seatable[] = [];
+  let value = 0;
   seating(
-    playing.map((player) => player.positions),
+    order.map((entry) => entry.positions),
     seats,
+    { counted: order.map((entry) => entry.player === null), most: spots },
   ).forEach((seatedTonight, index) => {
     if (seatedTonight) {
-      starters.push(playing[index]);
+      const { player, worth } = order[index];
+      if (player) {
+        starters.push(player);
+      }
+      value += worth;
     }
   });
-  return { starters, value: starters.reduce((sum, player) => sum + worthOn(player, date), 0) };
+  return { starters, value };
 }
 
 /**
  * The roster weighed over the rest of the season: each player's starts and value, and what the
  * lineup would lose without him. The marginal is counted only over the nights he plays, since the
- * other nights seat the same lineup with or without him.
+ * other nights seat the same lineup with or without him; for a player on injured reserve who would
+ * take a streaming spot back, over every night from then, which have the spot without him. A
+ * streamer costs what his spot fills: every night with one spot fewer.
  */
 export function valueLineup(
   team: readonly TeamPlayer[],
@@ -249,16 +418,21 @@ export function valueLineup(
   schedule: ReadonlyMap<string, readonly string[]>,
   score: (playerId: string) => number | null,
   weights: NightWeights = EVEN_NIGHTS,
+  streaming: Streaming = NO_STREAMING,
 ): LineupValuation {
   const seats = lineupSeats(slots);
-  const players = seatables(team, schedule, score, weights);
+  const held = streamersOf(team, streaming);
+  const players = seatables(team, schedule, score, weights).filter(
+    (player) => !held.has(player.playerId),
+  );
+  const spots = streams(team, held.size, streaming.freeAgents, schedule, weights);
   const nights = allNights(schedule);
   const starts = new Map<string, number>();
   const values = new Map<string, number>();
   const nightValues = new Map<string, number>();
   let total = 0;
   for (const date of nights) {
-    const tonight = night(players, date, seats);
+    const tonight = night(players, date, seats, spots);
     total += tonight.value;
     nightValues.set(date, tonight.value);
     for (const starter of tonight.starters) {
@@ -269,10 +443,11 @@ export function valueLineup(
   const byPlayer = new Map<string, LineupValue>();
   for (const player of players) {
     const others = players.filter((other) => other !== player);
+    const after = withoutReturn(spots, player.playerId);
     let lost = 0;
-    for (const date of player.nights) {
+    for (const date of after === spots ? player.nights : nights) {
       if (nightValues.has(date)) {
-        lost += (nightValues.get(date) ?? 0) - night(others, date, seats).value;
+        lost += (nightValues.get(date) ?? 0) - night(others, date, seats, after).value;
       }
     }
     byPlayer.set(player.playerId, {
@@ -281,7 +456,25 @@ export function valueLineup(
       games: player.nights.size,
       value: values.get(player.playerId) ?? 0,
       marginal: lost,
+      streamer: false,
     });
+  }
+  if (held.size > 0) {
+    const fewer = oneFewer(spots);
+    let spot = 0;
+    for (const date of nights) {
+      spot += (nightValues.get(date) ?? 0) - night(players, date, seats, fewer).value;
+    }
+    for (const playerId of held) {
+      byPlayer.set(playerId, {
+        playerId,
+        starts: 0,
+        games: 0,
+        value: 0,
+        marginal: spot,
+        streamer: true,
+      });
+    }
   }
   for (const player of team) {
     if (!byPlayer.has(player.playerId)) {
@@ -291,6 +484,7 @@ export function valueLineup(
         games: 0,
         value: 0,
         marginal: 0,
+        streamer: false,
       });
     }
   }
@@ -313,6 +507,10 @@ export interface DropPricing {
  * drop is the page's choice, not the model's: the lineup without him is set once for every
  * night he plays, and each pickup then costs only the nights he plays himself. A drop who is out
  * costs only the nights he plays once back.
+ *
+ * <p>A streamer dropped for a pickup turns his spot into a hold: the lineup keeps its players,
+ * gains the pickup and has one spot fewer on every night, so what the swap costs is the spot's
+ * season, not the streamer's own projection.
  */
 export function priceDrop(
   drop: TeamPlayer,
@@ -321,25 +519,36 @@ export function priceDrop(
   schedule: ReadonlyMap<string, readonly string[]>,
   score: (playerId: string) => number | null,
   weights: NightWeights = EVEN_NIGHTS,
+  streaming: Streaming = NO_STREAMING,
 ): DropPricing {
   const seats = lineupSeats(slots);
-  const players = seatables(team, schedule, score, weights);
-  const without = players.filter((player) => player.playerId !== drop.playerId);
+  const held = streamersOf(team, streaming);
+  const players = seatables(team, schedule, score, weights).filter(
+    (player) => !held.has(player.playerId),
+  );
+  const spots = streams(team, held.size, streaming.freeAgents, schedule, weights);
+  const streamerDropped = held.has(drop.playerId);
+  const without = streamerDropped
+    ? players
+    : players.filter((player) => player.playerId !== drop.playerId);
+  const after = streamerDropped ? oneFewer(spots) : withoutReturn(spots, drop.playerId);
   const dropped = players.find((player) => player.playerId === drop.playerId);
   const base = new Map<string, number>();
   const asItStands = (date: string): number => {
     let value = base.get(date);
     if (value === undefined) {
-      value = night(players, date, seats).value;
+      value = night(players, date, seats, spots).value;
       base.set(date, value);
     }
     return value;
   };
-  // The nights only the drop plays lose what his seat was worth, the same for every pickup.
-  const dropNights = dropped?.nights ?? new Set<string>();
+  // The nights only the drop plays lose what his seat was worth, the same for every pickup; with
+  // his spot gone, or the spot he would take back from reserve left free, every night changes.
+  const dropNights: Iterable<string> =
+    after === spots ? (dropped?.nights ?? new Set<string>()) : allNights(schedule);
   const lostWithout = new Map<string, number>();
   for (const date of dropNights) {
-    lostWithout.set(date, night(without, date, seats).value - asItStands(date));
+    lostWithout.set(date, night(without, date, seats, after).value - asItStands(date));
   }
   return {
     gainFor(pickup: Pickup): number | null {
@@ -360,7 +569,7 @@ export function priceDrop(
       };
       let gain = 0;
       for (const date of nights) {
-        gain += night([...without, added], date, seats).value - asItStands(date);
+        gain += night([...without, added], date, seats, after).value - asItStands(date);
       }
       for (const [date, lost] of lostWithout) {
         if (!nights.has(date)) {

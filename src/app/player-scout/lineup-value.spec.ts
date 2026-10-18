@@ -2,7 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { RosterSlots } from '../api/models/roster-slots';
 import { Projection } from '../models/projection.model';
 import { NightWorth, TeamPlayer } from '../services/player-scout.service';
-import { NightWeights, priceDrop, StatShares, statShares, valueLineup } from './lineup-value';
+import {
+  EVEN_NIGHTS,
+  NightWeights,
+  Pickup,
+  priceDrop,
+  StatShares,
+  statShares,
+  STREAM_RANK,
+  Streaming,
+  valueLineup,
+} from './lineup-value';
 
 /** Two centre seats, one wing, one defence seat, a goalie seat and a bench. */
 const SLOTS: RosterSlots = { c: 2, lw: 1, rw: 0, w: 0, f: 0, d: 1, util: 0, bn: 2, g: 1 };
@@ -326,6 +336,168 @@ describe('nights with a worth', () => {
     expect(pricing.gainFor({ ...level, shares })).toBeCloseTo(0);
     // Unweighed he is worth his even 5 on the third night, short of what d2 made of it.
     expect(pricing.gainFor(level)).toBeLessThan(0);
+  });
+});
+
+describe('streaming spots', () => {
+  // Two Util seats, so any skater fits either, and a week of four nights: Monday is the quiet one.
+  const UTIL: RosterSlots = { c: 0, lw: 0, rw: 0, w: 0, f: 0, d: 0, util: 2, bn: 2, g: 0 };
+  const [MON, TUE, THU, SAT] = ['2026-11-02', '2026-11-03', '2026-11-05', '2026-11-07'];
+  const week = schedule({
+    EDM: [TUE, THU, SAT],
+    COL: [MON, THU, SAT],
+    BOS: [TUE, THU, SAT],
+    MTL: [MON],
+    TOR: [TUE],
+    NYR: [THU],
+    CHI: [SAT],
+  });
+  const agent = (playerId: string, teamAbbrev: string, score: number): Pickup => ({
+    playerId,
+    positions: ['C'],
+    teamAbbrev,
+    score,
+  });
+  // One game each, so a free agent's score is his worth on his night. The third best each night,
+  // the spot's: Monday 2, Tuesday 6, Thursday 4, Saturday 3.
+  const freeAgents = [
+    agent('m1', 'MTL', 7),
+    agent('m2', 'MTL', 5),
+    agent('m3', 'MTL', 2),
+    agent('t1', 'TOR', 9),
+    agent('t2', 'TOR', 8),
+    agent('t3', 'TOR', 6),
+    agent('t4', 'TOR', 5),
+    agent('h1', 'NYR', 8),
+    agent('h2', 'NYR', 7),
+    agent('h3', 'NYR', 4),
+    agent('s1', 'CHI', 9),
+    agent('s2', 'CHI', 6),
+    agent('s3', 'CHI', 3),
+  ];
+  // The core's one skater fills a seat on the busy nights; Hughes is held to stream; the drop
+  // plays for a club the week does not have, so he costs nothing and the pickup is the question.
+  const team = [
+    player('x', ['C'], 'EDM'),
+    player('hughes', ['C'], 'EDM'),
+    player('z', ['C'], 'XXX'),
+  ];
+  const scores: Record<string, number> = { x: 60, hughes: 1000, z: 50 };
+  const score = (id: string) => scores[id] ?? null;
+  const streaming: Streaming = { streamers: new Set(['hughes']), freeAgents };
+  const a = { playerId: 'a', positions: ['C'], teamAbbrev: 'COL', score: 30 };
+  const b = { playerId: 'b', positions: ['C'], teamAbbrev: 'BOS', score: 30 };
+
+  it('counts a spot each night at the third best free agent there', () => {
+    expect(STREAM_RANK).toBe(3);
+    const valuation = valueLineup(team, UTIL, week, score, EVEN_NIGHTS, streaming);
+
+    // x's three games at 20, and the spot's 2 + 6 + 4 + 3 beside him.
+    expect(valuation.total).toBeCloseTo(60 + 15);
+    // The streamer is a spot, not a seat: his own 1000 is no part of it, and his going costs the
+    // spot's season.
+    expect(valuation.byPlayer.get('hughes')).toMatchObject({
+      starts: 0,
+      value: 0,
+      streamer: true,
+    });
+    expect(valuation.byPlayer.get('hughes')?.marginal).toBeCloseTo(15);
+    expect(valuation.byPlayer.get('x')?.streamer).toBe(false);
+  });
+
+  it('prices a pickup who plays the quiet night above one who plays the busy one', () => {
+    const pricing = priceDrop(team[2], team, UTIL, week, score, EVEN_NIGHTS, streaming);
+
+    // Ten a game each. On Thursday and Saturday each takes the open seat from the spot (10 less
+    // 4, 10 less 3). On Monday A has a seat to spare and the spot fills the other; on Tuesday B
+    // takes the spot's one seat, worth 6 to it. So A is ahead by Tuesday's stream.
+    expect(pricing.gainFor(a)).toBeCloseTo(10 + 6 + 7);
+    expect(pricing.gainFor(b)).toBeCloseTo(4 + 6 + 7);
+    expect(pricing.gainFor(a)! - pricing.gainFor(b)!).toBeCloseTo(6);
+  });
+
+  it('prices the two alike with no spot held: every open seat is worth nothing', () => {
+    const core = [team[0], team[2]];
+    const pricing = priceDrop(team[2], core, UTIL, week, score, EVEN_NIGHTS, {
+      ...streaming,
+      streamers: new Set(),
+    });
+
+    expect(pricing.gainFor(a)).toBeCloseTo(30);
+    expect(pricing.gainFor(b)).toBeCloseTo(30);
+  });
+
+  it("charges a streamer dropped for a hold his spot's season, not his own projection", () => {
+    const pricing = priceDrop(team[1], team, UTIL, week, score, EVEN_NIGHTS, streaming);
+
+    // The hold's 30 in seats the spot no longer fills, less the spot's 15.
+    expect(pricing.gainFor(a)).toBeCloseTo(30 - 15);
+    expect(pricing.gainFor(b)).toBeCloseTo(30 - 15);
+  });
+
+  it('benches a player of the core for the spot on a night the stream is worth more', () => {
+    // One seat, held by a core player worth 2 a game; Tuesday's third best is worth 6.
+    const one: RosterSlots = { ...UTIL, util: 1 };
+    const roster = [player('weak', ['C'], 'TOR'), player('hughes', ['C'], 'EDM')];
+    const valuation = valueLineup(
+      roster,
+      one,
+      week,
+      (id) => (id === 'weak' ? 2 : 1000),
+      EVEN_NIGHTS,
+      { streamers: new Set(['hughes']), freeAgents },
+    );
+
+    expect(valuation.byPlayer.get('weak')).toMatchObject({ starts: 0, value: 0 });
+    // Benched or gone, the night is the spot's: his going costs nothing, never less.
+    expect(valuation.byPlayer.get('weak')?.marginal).toBeCloseTo(0);
+    expect(valueLineup(roster, one, week, () => 2).byPlayer.get('weak')?.starts).toBe(1);
+  });
+
+  it('gives a spot back to each player on injured reserve from his first night back', () => {
+    // Ten nights, a free agent's third best worth 5 every one of them, and a defenceman on
+    // reserve back for the last four at 10 a game.
+    const back = {
+      type: 'skater',
+      playerId: 0,
+      stats: { scoring: {}, utility: { gp: 4 } },
+    } as unknown as Projection;
+    const roster = [
+      player('x', ['C']),
+      player('hughes', ['C']),
+      player('ir', ['D'], 'EDM', { out: true, reserve: true, projection: back }),
+    ];
+    const valuation = valueLineup(
+      roster,
+      UTIL,
+      schedule({ EDM: NIGHTS, FLA: NIGHTS }),
+      (id) => ({ x: 200, hughes: 1000, ir: 40 })[id] ?? null,
+      EVEN_NIGHTS,
+      {
+        streamers: new Set(['hughes']),
+        freeAgents: [agent('f1', 'FLA', 100), agent('f2', 'FLA', 80), agent('f3', 'FLA', 50)],
+      },
+    );
+
+    // The spot fills the six nights before his return, and is his from then.
+    expect(valuation.byPlayer.get('hughes')?.marginal).toBeCloseTo(6 * 5);
+    expect(valuation.byPlayer.get('ir')?.starts).toBe(4);
+    // Without him the spot would stream those four nights too: he is worth 10 less 5 on each.
+    expect(valuation.byPlayer.get('ir')?.marginal).toBeCloseTo(4 * (10 - 5));
+  });
+
+  it('holds no spot for a player marked as a streamer while he is on injured reserve', () => {
+    const roster = [
+      player('x', ['C'], 'EDM'),
+      player('hurt', ['C'], 'EDM', { reserve: true, out: true }),
+    ];
+    const valuation = valueLineup(roster, UTIL, week, score, EVEN_NIGHTS, {
+      streamers: new Set(['hurt']),
+      freeAgents,
+    });
+
+    expect(valuation.byPlayer.get('hurt')?.streamer).toBe(false);
+    expect(valuation.total).toBeCloseTo(60);
   });
 });
 

@@ -478,7 +478,8 @@ select:focus-visible,
   --pos-bg: rgba(255, 255, 255, 0.16);
 }
 
-.pill--drop.pill--active .drop-tag--out {
+.pill--drop.pill--active .drop-tag--out,
+.pill--drop.pill--active .drop-tag--streamer {
   border-color: var(--color-primary-contrast);
   color: var(--color-primary-contrast);
 }
@@ -696,6 +697,16 @@ select:focus-visible,
 .drop-tag--out {
   border-color: var(--color-danger);
   color: var(--color-danger);
+}
+
+/* A streamer is a spot rather than a player in the lineup: his tag says so beside his cost, which
+   is the spot's, and is no warning, so it wears the text's own grey and not the injury red. */
+.drop-tag--streamer {
+  color: var(--color-text-muted);
+}
+
+.roster-table .streamer-col {
+  text-align: center;
 }
 
 .drop-score {

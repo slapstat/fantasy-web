@@ -39,10 +39,14 @@ import {
   EVEN_NIGHTS,
   LineupValue,
   NightWeights,
+  NO_STREAMING,
+  Pickup,
   priceDrop,
   statShares,
+  Streaming,
   valueLineup,
 } from './lineup-value';
+import { readStreamers, writeStreamers } from './scout-streamers';
 import {
   nextScoutSort,
   rankScout,
@@ -98,9 +102,12 @@ export interface RosterEntry {
   /**
    * Whether his place in the lineup could be weighed: the league's slots known, and his club's
    * nights too. A healthy player on a club the schedule does not know starts nowhere by our
-   * reckoning, which is not the same as being worth nothing, so he is never the cheapest.
+   * reckoning, which is not the same as being worth nothing, so he is never the cheapest. A
+   * streamer is a spot, whatever his club, so he always is.
    */
   readonly weighed: boolean;
+  /** Held as a streamer, as the reader marked him: a streaming spot, not a lineup cost. */
+  readonly streamer: boolean;
 }
 
 /** A league team as the pool offers it. */
@@ -368,11 +375,15 @@ export class PlayerScoutComponent {
       : 'Projected Z-Score for the rest of the season. Zero is the last player a league this size would roster.',
   );
 
-  readonly dropCostTip = computed(() =>
-    this.scoringType() === 'points'
-      ? 'The total points your team would lose if you dropped this player.'
-      : 'The total Z-Score your team would lose if you dropped this player.',
-  );
+  readonly dropCostTip = computed(() => {
+    const tip =
+      this.scoringType() === 'points'
+        ? 'The total points your team would lose if you dropped this player.'
+        : 'The total Z-Score your team would lose if you dropped this player.';
+    return this.streaming()
+      ? `${tip} For a streamer, what his streaming spot would score over the rest of the season.`
+      : tip;
+  });
 
   readonly categories = computed<readonly ScoringStatKey[]>(() => [
     ...this.scoring().activeScoringColumns,
@@ -641,6 +652,71 @@ export class PlayerScoutComponent {
     };
   });
 
+  /**
+   * The players the reader holds as streamers in this league, by platform id, as he marked them:
+   * nobody until he marks one, and kept for the league from one visit to the next.
+   */
+  private readonly streamerMarks = linkedSignal<ChosenLeague | null, ReadonlySet<string>>({
+    source: () => this.league(),
+    computation: (league) => (league ? readStreamers(league) : new Set<string>()),
+  });
+
+  /** Marks him as a streamer, or as a hold again when he is one; marks for players gone are let go. */
+  toggleStreamer(playerId: string): void {
+    const league = this.league();
+    const team = this.team();
+    if (!league || !team) {
+      return;
+    }
+    const marks = new Set(this.streamerMarks());
+    if (!marks.delete(playerId)) {
+      marks.add(playerId);
+    }
+    const kept = new Set(
+      team.map((player) => player.playerId).filter((playerId) => marks.has(playerId)),
+    );
+    this.streamerMarks.set(kept);
+    writeStreamers(league, kept);
+  }
+
+  /** Whether he is held as a streamer: marked, and holding a roster spot rather than IR's. */
+  private isStreamer(player: TeamPlayer): boolean {
+    return !player.reserve && this.streamerMarks().has(player.playerId);
+  }
+
+  /** Whether any streaming spot is held, so an open lineup spot is worth what a streamer scores. */
+  readonly streaming = computed(() =>
+    (this.team() ?? []).some((player) => this.isStreamer(player)),
+  );
+
+  /** A row of the list as the lineup weighs him: his positions, club, score and stat shares. */
+  private pickupOf(row: ScoutRow, units: ScoreUnits | null): Pickup {
+    return {
+      playerId: row.player.playerId,
+      positions: row.player.positions,
+      teamAbbrev: row.player.teamAbbrev,
+      score: row.score,
+      shares: units ? statShares(row.line, units) : undefined,
+    };
+  }
+
+  /**
+   * The streamers and the free agents their spots fill from: every free agent in the league,
+   * whatever the list is narrowed to, and none on waivers, who cannot be streamed tonight.
+   */
+  private readonly streamPool = computed<Streaming>(() => {
+    if (!this.streaming()) {
+      return NO_STREAMING;
+    }
+    const units = this.units();
+    return {
+      streamers: this.streamerMarks(),
+      freeAgents: this.ranked()
+        .filter((row) => row.scout.owner === null && row.player.availability === 'FREE_AGENT')
+        .map((row) => this.pickupOf(row, units)),
+    };
+  });
+
   /** The roster weighed night by night over the rest of the season; null while anything is missing. */
   readonly valuation = computed(() => {
     const team = this.team();
@@ -649,7 +725,14 @@ export class PlayerScoutComponent {
     if (!team || !slots || schedule.size === 0) {
       return null;
     }
-    return valueLineup(team, slots, schedule, this.scoreOfOwn(), this.nightWeights());
+    return valueLineup(
+      team,
+      slots,
+      schedule,
+      this.scoreOfOwn(),
+      this.nightWeights(),
+      this.streamPool(),
+    );
   });
 
   /** Room for a pickup with nobody dropped: open roster spots, injured players to move to IR. */
@@ -682,12 +765,15 @@ export class PlayerScoutComponent {
       .map((player) => {
         const row = scores.get(player.playerId);
         const value = valuation?.byPlayer.get(player.playerId) ?? null;
+        const streamer = this.isStreamer(player);
         return {
           player,
           score: row?.score ?? null,
           value,
           delta: row?.delta ?? null,
-          weighed: valuation === null || value === null || value.games > 0 || player.out,
+          weighed:
+            streamer || valuation === null || value === null || value.games > 0 || player.out,
+          streamer,
         };
       })
       .sort(
@@ -703,18 +789,20 @@ export class PlayerScoutComponent {
   /**
    * Whether he can be the drop: he holds a roster spot, the model has a line for him, and his
    * place in the lineup could be weighed. A player who is out qualifies, priced at the nights he
-   * plays once back; the chips leave him out, and the fold-out offers him.
+   * plays once back; the chips leave him out, and the fold-out offers him. A streamer always
+   * can: what he costs is his spot, whatever the model makes of him.
    */
   canDrop(entry: RosterEntry): boolean {
-    return !entry.player.reserve && entry.score !== null && entry.weighed;
+    return !entry.player.reserve && (entry.streamer || (entry.score !== null && entry.weighed));
   }
 
   /**
    * The players a drop would usually be: those holding a spot the model can weigh and who are
-   * not out, the one whose going costs the lineup least first.
+   * not out, the one whose going costs the lineup least first. A streamer out hurt is one still,
+   * since his spot is what goes.
    */
   readonly dropCandidates = computed<readonly RosterEntry[]>(() =>
-    this.roster().filter((entry) => this.canDrop(entry) && !entry.player.out),
+    this.roster().filter((entry) => this.canDrop(entry) && (entry.streamer || !entry.player.out)),
   );
 
   /** The drop the reader picked, by platform id; none until he picks, and forgotten with the league. */
@@ -824,9 +912,9 @@ export class PlayerScoutComponent {
     this.rosterRows().some((entry) => entry.value && entry.score !== null && !entry.weighed),
   );
 
-  /** "48 / 71": the nights he starts in the lineup, of the nights his club plays. */
+  /** "48 / 71": the nights he starts in the lineup, of the nights his club plays; none for a streamer. */
   starts(entry: RosterEntry): string {
-    if (!entry.value || !entry.weighed) {
+    if (!entry.value || !entry.weighed || entry.streamer) {
       return '';
     }
     return `${entry.value.starts} / ${entry.value.games}`;
@@ -981,21 +1069,19 @@ export class PlayerScoutComponent {
     if (pickups.length === 0) {
       return null;
     }
-    const weights = this.nightWeights();
     const units = this.units();
-    const pricing = priceDrop(drop.player, team, slots, schedule, this.scoreOfOwn(), weights);
+    const pricing = priceDrop(
+      drop.player,
+      team,
+      slots,
+      schedule,
+      this.scoreOfOwn(),
+      this.nightWeights(),
+      this.streamPool(),
+    );
     const gains = new Map<string, number | null>();
     for (const row of pickups) {
-      gains.set(
-        row.player.playerId,
-        pricing.gainFor({
-          playerId: row.player.playerId,
-          positions: row.player.positions,
-          teamAbbrev: row.player.teamAbbrev,
-          score: row.score,
-          shares: units ? statShares(row.line, units) : undefined,
-        }),
-      );
+      gains.set(row.player.playerId, pricing.gainFor(this.pickupOf(row, units)));
     }
     return gains;
   });

@@ -120,6 +120,7 @@ describe('ScoutTableComponent', () => {
       gains?: ReadonlyMap<string, number | null> | null;
       dropName?: string;
       dropScore?: number | null;
+      streaming?: boolean;
       showOwner?: boolean;
     } = {},
   ) {
@@ -540,5 +541,19 @@ describe('ScoutTableComponent', () => {
     expect(
       ngMocks.findAll(categories, '.player-gain').map((line) => ngMocks.formatText(line)),
     ).toEqual(['Lineup +1.50']);
+  });
+
+  it('says an open lineup spot counts at a streamer, under the same heading, once streaming spots are held', () => {
+    const tip = (streaming: boolean) =>
+      render([row(1, 'Brandon Montour', 1)], {
+        gains: new Map<string, number | null>([['1', 12.5]]),
+        dropName: 'Hughes',
+        streaming,
+      }).point.componentInstance.gainTip();
+
+    expect(tip(false)).not.toContain('streamer');
+    expect(tip(true)).toContain(
+      'An open lineup spot counts at what a streamer would score in it that night',
+    );
   });
 });

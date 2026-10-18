@@ -101,6 +101,13 @@ describe('seating', () => {
     const seats = lineupSeats(slots({ c: 1, lw: 1 }));
     expect(seating([['C', 'LW'], ['C'], ['C']], seats)).toEqual([true, true, false]);
   });
+
+  it('seats no more of the players a limit counts than it allows, and passes over the rest', () => {
+    // Three seats, the second and third listed counted, one of them allowed: the third waits.
+    const seats = lineupSeats(slots({ c: 3 }));
+    const limit = { counted: [false, true, true, false], most: 1 };
+    expect(seating([['C'], ['C'], ['C'], ['C']], seats, limit)).toEqual([true, true, false, true]);
+  });
 });
 
 describe('nightRooms', () => {

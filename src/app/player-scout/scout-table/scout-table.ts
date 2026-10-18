@@ -133,6 +133,11 @@ export class ScoutTableComponent {
    * pickup's can be set against it; null when he has none.
    */
   readonly dropScore = input<number | null>(null);
+  /**
+   * Whether the user holds streaming spots, so the lineup's gain counts an open lineup spot at
+   * what a streamer would score in it that night rather than at nothing.
+   */
+  readonly streaming = input<boolean>(false);
   /** The order the list is in, which the headings show. */
   readonly sort = input<ScoutSort>(SCOUT_RANKED_ORDER);
   /** A heading pressed: the page sorts the whole list by that column, or turns it round. */
@@ -415,7 +420,10 @@ export class ScoutTableComponent {
 
   /** What the lineup column stands for, in its heading's tooltip. */
   gainTip(): string {
-    return `What your lineup gains over the rest of the season by picking him up and dropping ${this.dropName()}: only the nights he would start count`;
+    const tip = `What your lineup gains over the rest of the season by picking him up and dropping ${this.dropName()}: only the nights he would start count`;
+    return this.streaming()
+      ? `${tip}. An open lineup spot counts at what a streamer would score in it that night`
+      : tip;
   }
 
   /** What the projection column stands for, in its heading's tooltip. */

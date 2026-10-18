@@ -192,7 +192,9 @@
                               >
                                 <span class="pill-name">{{ chip.player.name }}</span>
                                 <app-position-chips [positions]="chip.player.positions" />
-                                @if (chip.player.out) {
+                                @if (chip.streamer) {
+                                  <span class="drop-tag drop-tag--streamer">Streamer</span>
+                                } @else if (chip.player.out) {
                                   <span class="drop-tag drop-tag--out">{{
                                     chip.player.injuryStatus ?? 'Out'
                                   }}</span>
@@ -254,6 +256,13 @@
                             Starts/Games left
                           </th>
                           <th scope="col" class="num" [appTooltip]="dropCostTip()">Cost to drop</th>
+                          <th
+                            scope="col"
+                            class="streamer-col"
+                            appTooltip="Mark the players you hold only for a few games. Each is a streaming spot: he leaves your lineup for the season, and every night the spot fills an open lineup spot at what the third-best free agent playing then would score. A player back from IR takes a streaming spot back."
+                          >
+                            Streamer
+                          </th>
                         }
                       </tr>
                     </thead>
@@ -325,6 +334,8 @@
             <app-position-chips [positions]="entry.player.positions" />
             @if (entry.player.reserve) {
               <span class="drop-tag drop-tag--out">{{ entry.player.slot ?? 'IR' }}</span>
+            } @else if (entry.streamer) {
+              <span class="drop-tag drop-tag--streamer">Streamer</span>
             } @else if (entry.player.out) {
               <span class="drop-tag drop-tag--out">{{ entry.player.injuryStatus ?? 'Out' }}</span>
             }
@@ -345,12 +356,26 @@
           @if (slotsKnown()) {
             <td class="num">{{ starts(entry) }}</td>
             <td class="num drop-score">
-              @if (entry.value && entry.score !== null && !entry.player.reserve) {
+              @if (
+                entry.value && (entry.score !== null || entry.streamer) && !entry.player.reserve
+              ) {
                 @if (entry.weighed) {
                   {{ dropCost(entry) }}
                 } @else {
                   <span class="drop-unknown">?</span>
                 }
+              }
+            </td>
+            <td class="streamer-col">
+              <!-- Nobody is a streamer until the reader marks him: the page cannot tell one. -->
+              @if (!entry.player.reserve) {
+                <input
+                  type="checkbox"
+                  class="streamer-mark"
+                  [checked]="entry.streamer"
+                  [attr.aria-label]="'Hold ' + entry.player.name + ' as a streamer'"
+                  (change)="toggleStreamer(entry.player.playerId)"
+                />
               }
             </td>
           }
@@ -506,6 +531,7 @@
             [gains]="gains()"
             [dropName]="dropSurname()"
             [dropScore]="drop()?.score ?? null"
+            [streaming]="streaming()"
             [sort]="sort()"
             (sortBy)="sortBy($event)"
           />

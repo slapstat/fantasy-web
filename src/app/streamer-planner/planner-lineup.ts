@@ -84,10 +84,14 @@ export function seated(players: readonly (readonly string[])[], seats: readonly 
  * best first, the lineup is the best one, as a manager would set it, and the ones left standing
  * are the ones he would bench. Rosters and lineups are a couple of dozen at most, so plain
  * augmenting paths are plenty.
+ *
+ * @param limit seats at most `most` of the players `counted` marks, passing over the rest of them
+ *   once that many sit, as a lineup with that many streaming spots would
  */
 export function seating(
   players: readonly (readonly string[])[],
   seats: readonly Seat[],
+  limit?: { readonly counted: readonly boolean[]; readonly most: number },
 ): readonly boolean[] {
   const owner: number[] = seats.map(() => -1);
   const place = (player: number, tried: boolean[]): boolean => {
@@ -103,12 +107,21 @@ export function seating(
     }
     return false;
   };
-  return players.map((_, player) =>
-    place(
+  let counted = 0;
+  return players.map((_, player) => {
+    const limited = limit?.counted[player] === true;
+    if (limited && counted >= limit.most) {
+      return false;
+    }
+    const placed = place(
       player,
       seats.map(() => false),
-    ),
-  );
+    );
+    if (placed && limited) {
+      counted += 1;
+    }
+    return placed;
+  });
 }
 
 /** How a night looks from the user's own lineup. */
