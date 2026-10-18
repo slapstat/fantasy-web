@@ -2,7 +2,8 @@
   <table class="free-agents-table scout-table" [class.scout-table--compare]="comparing()">
     <thead>
       <!-- With a comparison on, the projection columns are named once above them, with what
-           they are compared against; the ice view names its window the same way. -->
+           they are compared against; the ice view names its window the same way. The two gain
+           columns are named by the drop they are set against. -->
       @if (comparing()) {
         <tr class="group-row">
           <th scope="colgroup" colspan="2" class="group-col group-col--blank"></th>
@@ -11,8 +12,21 @@
             <span class="group-since">{{ sinceLabel() }}</span>
           </th>
           @if (gaining()) {
-            <th scope="colgroup" class="group-col group-col--start"></th>
+            <th scope="colgroup" colspan="2" class="group-col group-col--start group-col--gain">
+              <span class="group-name">vs {{ dropName() }}</span>
+            </th>
           }
+        </tr>
+      } @else if (gaining()) {
+        <tr class="group-row group-row--gain">
+          <th
+            scope="colgroup"
+            [attr.colspan]="2 + projectionSpan()"
+            class="group-col group-col--blank"
+          ></th>
+          <th scope="colgroup" colspan="2" class="group-col group-col--start group-col--gain">
+            <span class="group-name">vs {{ dropName() }}</span>
+          </th>
         </tr>
       } @else if (view() === 'ice') {
         <tr class="group-row">
@@ -109,11 +123,16 @@
             </th>
           }
           @if (gaining()) {
+            <!-- His projection less the drop's orders the list as his projection does, so the
+                 column has no sort of its own: the Points heading already sorts by it. -->
             <th
               scope="col"
-              class="num gain-col stat-col--start"
-              [attr.aria-sort]="ariaSort('gain')"
+              class="num score-gain-col stat-col--start"
+              [appTooltip]="scoreGainTip()"
             >
+              {{ scoreHeading() }}
+            </th>
+            <th scope="col" class="num gain-col" [attr.aria-sort]="ariaSort('gain')">
               <button
                 type="button"
                 class="sort"
@@ -123,7 +142,7 @@
                 @if (sort().key === 'gain') {
                   <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
                 }
-                vs {{ dropName() }}
+                Lineup
               </button>
             </th>
           }
@@ -223,14 +242,23 @@
                 <!-- On a phone the gain column is off the screen, so the gain rides in the
                      frozen player cell instead; the stylesheet shows one or the other. -->
                 @if (gaining() && pickable(entry.row)) {
-                  <span class="player-gain" [class.player-gain--top]="isTopGain(entry.row)">
-                    <span class="player-gain-label">Gain</span>
-                    &ngsp;
-                    @if (gain(entry.row); as gain) {
-                      <span class="gain gain--{{ gain.dir }}">{{ gain.text }}</span>
-                    } @else {
-                      <span class="gain-unknown">?</span>
+                  <span class="player-gains">
+                    @if (scoreGain(entry.row); as more) {
+                      <span class="player-gain">
+                        <span class="player-gain-label">{{ scoreHeading() }}</span>
+                        &ngsp;
+                        <span class="gain gain--score gain--{{ more.dir }}">{{ more.text }}</span>
+                      </span>
                     }
+                    <span class="player-gain" [class.player-gain--top]="isTopGain(entry.row)">
+                      <span class="player-gain-label">Lineup</span>
+                      &ngsp;
+                      @if (gain(entry.row); as gain) {
+                        <span class="gain gain--{{ gain.dir }}">{{ gain.text }}</span>
+                      } @else {
+                        <span class="gain-unknown">?</span>
+                      }
+                    </span>
                   </span>
                 }
               </span>
@@ -266,7 +294,14 @@
               </td>
             }
             @if (gaining()) {
-              <td class="num gain-col stat-col--start" [class.gain-col--top]="isTopGain(entry.row)">
+              <td class="num score-gain-col stat-col--start">
+                @if (pickable(entry.row)) {
+                  @if (scoreGain(entry.row); as more) {
+                    <span class="gain gain--score gain--{{ more.dir }}">{{ more.text }}</span>
+                  }
+                }
+              </td>
+              <td class="num gain-col" [class.gain-col--top]="isTopGain(entry.row)">
                 @if (pickable(entry.row)) {
                   @if (gain(entry.row); as gain) {
                     <span class="gain gain--{{ gain.dir }}">{{ gain.text }}</span>

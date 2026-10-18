@@ -505,6 +505,7 @@
             [showOwner]="pool() === 'all' || pool() === 'taken' || showMine()"
             [gains]="gains()"
             [dropName]="dropSurname()"
+            [dropScore]="drop()?.score ?? null"
             [sort]="sort()"
             (sortBy)="sortBy($event)"
           />

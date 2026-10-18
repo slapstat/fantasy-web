@@ -601,6 +601,9 @@ describe('PlayerScoutComponent', () => {
     expect(ngMocks.findAll(fixture, '.pill--drop')[1].attributes['aria-checked']).toBe('true');
     const table = ngMocks.find(fixture, ScoutTableComponent);
     expect(ngMocks.input(table, 'dropName')).toBe('202');
+    // His own projection goes with him, for the column that sets each pickup's against it.
+    expect(page.drop()?.score).toEqual(expect.any(Number));
+    expect(ngMocks.input(table, 'dropScore')).toBe(page.drop()?.score);
 
     // Show all unfolds the whole roster, and any row of it can be the drop.
     ngMocks.click(ngMocks.find(fixture, '.roster-toggle'));

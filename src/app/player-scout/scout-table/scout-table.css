@@ -211,14 +211,25 @@
    a green wash behind it, the ink's own tint, so they read as the most green and not, as the
    warning yellow had them, as the three to be careful of. The wash earns its keep in the default
    order by score, where the best gains lie scattered; sorted by the column they are the first
-   three rows anyway. */
+   three rows anyway.
+   Beside it, under the same "vs Silovs", his projection less the drop's: every game he plays
+   counted, the lineup's room or not. It is the plainer figure and the lineup's the deciding one, so
+   it is inked by its sign but not bold, and wears no wash. */
 .scout-table .gain-col {
-  min-width: 6rem;
+  min-width: 5rem;
+}
+
+.scout-table .score-gain-col {
+  min-width: 5rem;
 }
 
 .gain {
   font-variant-numeric: tabular-nums;
   font-weight: var(--weight-semibold);
+}
+
+.gain--score {
+  font-weight: normal;
 }
 
 .gain--up {
@@ -247,7 +258,7 @@
   color: var(--color-text-subtle);
 }
 
-.player-gain {
+.player-gains {
   display: none;
 }
 
@@ -258,10 +269,17 @@
     display: none;
   }
 
-  /* The gain column is off the screen on a phone, the far end of a sideways scroll, so the
-     figure rides as a line in the frozen player cell instead, labelled since its heading is gone. */
-  .scout-table .gain-col {
+  /* The gain columns are off the screen on a phone, the far end of a sideways scroll, so the
+     figures ride as a line in the frozen player cell instead, labelled since their headings are
+     gone, and the heading that named them goes with them. */
+  .scout-table :is(.gain-col, .score-gain-col, .group-col--gain, .group-row--gain) {
     display: none;
+  }
+
+  .player-gains {
+    column-gap: var(--space-3);
+    display: flex;
+    flex-wrap: wrap;
   }
 
   .player-gain {
