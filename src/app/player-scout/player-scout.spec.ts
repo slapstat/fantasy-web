@@ -116,6 +116,9 @@ function teamPlayer(now: Projection, positions: string[], reserve = false): Team
   };
 }
 
+/** Where the page keeps the players marked as streamers, per league. */
+const STREAMERS_KEY = 'slapstat.playerScout.streamers';
+
 const MINE: ScoutOwner = { teamName: 'Slapshots', mine: true };
 const THEIRS: ScoutOwner = { teamName: 'Someone Else', mine: false };
 
@@ -193,6 +196,7 @@ describe('PlayerScoutComponent', () => {
   let settings: LeagueProjectionSettingsResponse;
 
   beforeEach(() => {
+    localStorage.removeItem(STREAMERS_KEY);
     chosen = LEAGUE;
     settings = SETTINGS;
     players = vi.fn(() => of(league()));
@@ -572,7 +576,7 @@ describe('PlayerScoutComponent', () => {
     const headings = ngMocks
       .findAll(fixture, '.roster-table thead th')
       .map((th) => ngMocks.formatText(th));
-    expect(headings).toEqual(['Player', 'Points', 'Starts/Games left', 'Cost to drop']);
+    expect(headings).toEqual(['Player', 'Points', 'Starts/Games left', 'Cost to drop', 'Streamer']);
     expect(ngMocks.formatText(ngMocks.find(fixture, '.roster-more'))).toBe('Show all 12');
   });
 
@@ -626,6 +630,75 @@ describe('PlayerScoutComponent', () => {
     // A pick that is not on the roster, as after a league change, chooses nobody.
     page.pickDrop('nobody');
     expect(page.drop()).toBeNull();
+  });
+
+  it('holds a player as a streamer only once he is marked, prices his spot, and remembers the mark for the league', async () => {
+    // The C on injured reserve out for the season: back for no game, he takes no spot back.
+    const answer = team();
+    myTeam.mockReturnValue(
+      of({
+        ...answer,
+        team: {
+          ...answer.team,
+          players: answer.team.players.map((player) =>
+            player.reserve ? { ...player, projection: skater(211, 0, 0, 0) } : player,
+          ),
+        },
+      }),
+    );
+    let fixture = await render();
+    let page = fixture.point.componentInstance;
+
+    // Nobody is a streamer until the reader says so.
+    expect(page.streaming()).toBe(false);
+    expect(page.dropCandidates().map((entry) => entry.streamer)).not.toContain(true);
+    ngMocks.click(ngMocks.find(fixture, '.roster-toggle'));
+    fixture.detectChanges();
+    const marks = () =>
+      ngMocks.findAll(fixture, '.streamer-mark').map((box) => box.properties['checked']);
+    // A box for each of the eleven who hold a spot; none for the player on IR.
+    expect(marks()).toEqual(Array(11).fill(false));
+
+    const row = (name: string) =>
+      ngMocks
+        .findAll(fixture, '.roster-table tbody tr')
+        .find((tr) => ngMocks.formatText(tr).includes(name))!;
+    ngMocks.change(ngMocks.find(row('Mine 203'), '.streamer-mark'), true);
+    fixture.detectChanges();
+
+    expect(page.streaming()).toBe(true);
+    expect(JSON.parse(localStorage.getItem(STREAMERS_KEY) ?? '{}')).toEqual({
+      'YAHOO:465.l.9': ['203'],
+    });
+    // Out of the season's lineup, his Util spot is streamed every night at the third-best free
+    // centre, 6.8 a game: what his going costs is that spot, not his own 5 points.
+    expect(page.valuation()?.byPlayer.get('203')).toMatchObject({ streamer: true, starts: 0 });
+    expect(page.valuation()?.byPlayer.get('203')?.marginal).toBeCloseTo(68);
+    expect(ngMocks.formatText(row('Mine 203'))).toContain('Streamer');
+    const chips = ngMocks.findAll(fixture, '.pill--drop');
+    expect(chips.map((chip) => ngMocks.formatText(ngMocks.find(chip, '.pill-name')))).toEqual([
+      'Mine 202',
+      'Mine 210',
+      'Mine 203',
+      'Mine 207',
+    ]);
+    expect(ngMocks.formatText(chips[2])).toContain('Streamer');
+    expect(ngMocks.formatText(ngMocks.find(chips[2], '.pill-cost'))).toBe('68.0');
+
+    // Dropped for the best free centre, the spot becomes a hold: his 7 a game in it, 0.2 more
+    // than the stream it no longer makes, rather than 6.5 more than the streamer's own 0.5.
+    page.pickDrop('203');
+    expect(page.gains()?.get('1')).toBeCloseTo(2);
+    expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'streaming')).toBe(true);
+
+    // The mark is there on the next visit to the league, and gone once taken off.
+    fixture = await render();
+    page = fixture.point.componentInstance;
+    expect(page.streaming()).toBe(true);
+    page.toggleStreamer('203');
+    expect(page.streaming()).toBe(false);
+    expect(page.valuation()?.byPlayer.get('203')?.starts).toBe(10);
+    expect(JSON.parse(localStorage.getItem(STREAMERS_KEY) ?? '{}')).toEqual({});
   });
 
   it('names the player whose going costs the lineup least, not the lowest scorer, and prices every pickup against him', async () => {
