@@ -126,8 +126,13 @@ export class ScoutTableComponent {
    * of the user's.
    */
   readonly gains = input<ReadonlyMap<string, number | null> | null>(null);
-  /** The chosen drop's surname, for the gain column's heading. */
+  /** The chosen drop's surname, for the gain columns' heading. */
   readonly dropName = input<string>('');
+  /**
+   * The chosen drop's own projection for the rest of the season, scored as the rows are, so each
+   * pickup's can be set against it; null when he has none.
+   */
+  readonly dropScore = input<number | null>(null);
   /** The order the list is in, which the headings show. */
   readonly sort = input<ScoutSort>(SCOUT_RANKED_ORDER);
   /** A heading pressed: the page sorts the whole list by that column, or turns it round. */
@@ -384,7 +389,20 @@ export class ScoutTableComponent {
    * figure wears green or red like the changes beside it; null where the page could not price him.
    */
   gain(row: ScoutRow): Delta | null {
-    const gain = this.gains()?.get(row.player.playerId) ?? null;
+    return this.gainFigure(this.gains()?.get(row.player.playerId) ?? null);
+  }
+
+  /**
+   * His projection less the drop's, the same "+138.7" a gain is written as: what he would score
+   * that the drop would not, before the lineup decides how much of it gets to play. Null without
+   * a projection for the drop.
+   */
+  scoreGain(row: ScoutRow): Delta | null {
+    const drop = this.dropScore();
+    return this.gainFigure(drop === null ? null : row.score - drop);
+  }
+
+  private gainFigure(gain: number | null): Delta | null {
     if (gain === null) {
       return null;
     }
@@ -395,9 +413,17 @@ export class ScoutTableComponent {
     return { text: gain > 0 ? `+${text}` : text, dir: gain > 0 ? 'up' : 'down' };
   }
 
-  /** What the heading's short "vs Silovs" stands for, in the tooltip. */
+  /** What the lineup column stands for, in its heading's tooltip. */
   gainTip(): string {
-    return `What your lineup gains over the rest of the season by picking him up and dropping ${this.dropName()}`;
+    return `What your lineup gains over the rest of the season by picking him up and dropping ${this.dropName()}: only the nights he would start count`;
+  }
+
+  /** What the projection column stands for, in its heading's tooltip. */
+  scoreGainTip(): string {
+    const drop = this.dropScore();
+    const what = this.scoringType() === 'points' ? 'projected points' : 'projected Z-Score';
+    const his = drop === null ? '' : ` (${drop.toFixed(this.scoreDigits())})`;
+    return `His ${what} for the rest of the season less ${this.dropName()}'s${his}, every game counted, whether or not your lineup has room for him`;
   }
 
   isTopGain(row: ScoutRow): boolean {
