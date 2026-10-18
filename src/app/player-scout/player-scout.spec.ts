@@ -684,7 +684,6 @@ describe('PlayerScoutComponent', () => {
     ]);
     expect(ngMocks.formatText(chips[2])).toContain('Streamer');
     expect(ngMocks.formatText(ngMocks.find(chips[2], '.pill-cost'))).toBe('68.0');
-    expect(page.dropCostTip()).toContain('For a streamer');
 
     // Dropped for the best free centre, the spot becomes a hold: his 7 a game in it, 0.2 more
     // than the stream it no longer makes, rather than 6.5 more than the streamer's own 0.5.

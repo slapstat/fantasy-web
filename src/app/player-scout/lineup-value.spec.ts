@@ -454,36 +454,92 @@ describe('streaming spots', () => {
     expect(valueLineup(roster, one, week, () => 2).byPlayer.get('weak')?.starts).toBe(1);
   });
 
+  // Ten nights, a free agent's third best worth 5 every one of them, and a defenceman on reserve
+  // back for the last four at 10 a game.
+  const backForFour = {
+    type: 'skater',
+    playerId: 0,
+    stats: { scoring: {}, utility: { gp: 4 } },
+  } as unknown as Projection;
+  const injured = [
+    player('x', ['C']),
+    player('hughes', ['C']),
+    player('ir', ['D'], 'EDM', { out: true, reserve: true, projection: backForFour }),
+  ];
+  const tenNights = schedule({ EDM: NIGHTS, FLA: NIGHTS });
+  const injuredScore = (id: string) => ({ x: 200, hughes: 1000, ir: 40 })[id] ?? null;
+  const deep: Streaming = {
+    streamers: new Set(['hughes']),
+    freeAgents: [agent('f1', 'FLA', 100), agent('f2', 'FLA', 80), agent('f3', 'FLA', 50)],
+  };
+  // A centre on the wire at 6 a game, every night.
+  const hold = { playerId: 'p', positions: ['C'], teamAbbrev: 'FLA', score: 60 };
+
   it('gives a spot back to each player on injured reserve from his first night back', () => {
-    // Ten nights, a free agent's third best worth 5 every one of them, and a defenceman on
-    // reserve back for the last four at 10 a game.
-    const back = {
-      type: 'skater',
-      playerId: 0,
-      stats: { scoring: {}, utility: { gp: 4 } },
-    } as unknown as Projection;
-    const roster = [
-      player('x', ['C']),
-      player('hughes', ['C']),
-      player('ir', ['D'], 'EDM', { out: true, reserve: true, projection: back }),
-    ];
-    const valuation = valueLineup(
-      roster,
-      UTIL,
-      schedule({ EDM: NIGHTS, FLA: NIGHTS }),
-      (id) => ({ x: 200, hughes: 1000, ir: 40 })[id] ?? null,
-      EVEN_NIGHTS,
-      {
-        streamers: new Set(['hughes']),
-        freeAgents: [agent('f1', 'FLA', 100), agent('f2', 'FLA', 80), agent('f3', 'FLA', 50)],
-      },
-    );
+    const valuation = valueLineup(injured, UTIL, tenNights, injuredScore, EVEN_NIGHTS, deep);
 
     // The spot fills the six nights before his return, and is his from then.
     expect(valuation.byPlayer.get('hughes')?.marginal).toBeCloseTo(6 * 5);
     expect(valuation.byPlayer.get('ir')?.starts).toBe(4);
     // Without him the spot would stream those four nights too: he is worth 10 less 5 on each.
     expect(valuation.byPlayer.get('ir')?.marginal).toBeCloseTo(4 * (10 - 5));
+  });
+
+  it('prices a streamer dropped for a hold only up to the night the injured player takes the spot back', () => {
+    const pricing = priceDrop(
+      injured[1],
+      injured,
+      UTIL,
+      tenNights,
+      injuredScore,
+      EVEN_NIGHTS,
+      deep,
+    );
+
+    // Six nights the hold's 6 replaces the stream's 5; from the return the spot was going anyway.
+    expect(pricing.gainFor(hold)).toBeCloseTo(6 * (6 - 5));
+  });
+
+  it('frees the spot a dropped player on reserve would have taken back', () => {
+    const pricing = priceDrop(
+      injured[2],
+      injured,
+      UTIL,
+      tenNights,
+      injuredScore,
+      EVEN_NIGHTS,
+      deep,
+    );
+
+    // Six nights the hold beats the stream by 1; the last four he and the spot's 5 stand in for
+    // the returning defenceman's 10 and the stream he would have ended, 26 against 30.
+    expect(pricing.gainFor(hold)).toBeCloseTo(6 * 1 - 4 * 4);
+  });
+
+  it('lets a free agent eligible at two positions fill one spot a night, not two', () => {
+    // Two spots and nobody else: the third best at C and at LW is the same player, at 7 a game,
+    // and there is no fourth at either.
+    const wing = (playerId: string, score: number): Pickup => ({
+      ...agent(playerId, 'FLA', score),
+      positions: ['LW'],
+    });
+    const pool = [
+      agent('c1', 'FLA', 90),
+      agent('c2', 'FLA', 80),
+      wing('l1', 90),
+      wing('l2', 80),
+      { ...agent('both', 'FLA', 70), positions: ['C', 'LW'] },
+    ];
+    const valuation = valueLineup(
+      [player('s1', ['C']), player('s2', ['C'])],
+      UTIL,
+      tenNights,
+      () => 50,
+      EVEN_NIGHTS,
+      { streamers: new Set(['s1', 's2']), freeAgents: pool },
+    );
+
+    expect(valuation.total).toBeCloseTo(10 * 7);
   });
 
   it('holds no spot for a player marked as a streamer while he is on injured reserve', () => {

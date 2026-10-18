@@ -146,7 +146,7 @@ export interface Streaming {
 /** No spot held for streamers: the season's lineup is the whole roster, an open seat worth nothing. */
 export const NO_STREAMING: Streaming = { streamers: new Set(), freeAgents: [] };
 
-/** A free agent a spot could seat on a night: one of his positions, and his worth that night. */
+/** A free agent a spot could seat on a night: where he may sit, and his worth that night. */
 interface Fill {
   readonly positions: readonly string[];
   readonly worth: number;
@@ -297,24 +297,44 @@ function allNights(schedule: ReadonlyMap<string, readonly string[]>): string[] {
   return [...nights].sort((a, b) => a.localeCompare(b));
 }
 
+/** A free agent's worth on one of his nights, as a position's pool ranks him. */
+interface Ranked {
+  readonly agent: Pickup;
+  readonly worth: number;
+}
+
 /**
- * The streaming spots over the rest of the season: as many as the streamers held, each night's
- * free agents a spot could seat, and when the players on injured reserve take spots back. A spot
- * is counted at the {@link STREAM_RANK}th best free agent at a position that night, the next spot
- * at the one after him, and a free agent worth nothing that night fills nothing.
+ * The last fills worked out for each pool, with what they were worked out from: the roster's
+ * valuation and every repricing of the list (a search, a filter) ask for the same ones, and the
+ * pool, the schedule and the nights' worth keep their identity until one of them changes.
  */
-function streams(
-  team: readonly TeamPlayer[],
+const weighedPools = new WeakMap<
+  Streaming,
+  {
+    readonly schedule: ReadonlyMap<string, readonly string[]>;
+    readonly weights: NightWeights;
+    readonly held: number;
+    readonly fills: ReadonlyMap<string, readonly Fill[]>;
+  }
+>();
+
+/**
+ * Each night's free agents a spot could seat, best first: at each position the
+ * {@link STREAM_RANK}th best whose club plays, the next spot at the one after him, and none worth
+ * nothing that night. A free agent picked at two positions is one fill, able to sit at either.
+ */
+function fillsOf(
+  streaming: Streaming,
   held: number,
-  freeAgents: readonly Pickup[],
   schedule: ReadonlyMap<string, readonly string[]>,
   weights: NightWeights,
-): Streams {
-  if (held === 0) {
-    return NO_STREAMS;
+): ReadonlyMap<string, readonly Fill[]> {
+  const kept = weighedPools.get(streaming);
+  if (kept?.schedule === schedule && kept.weights === weights && kept.held === held) {
+    return kept.fills;
   }
-  const byNight = new Map<string, Map<string, number[]>>();
-  for (const agent of freeAgents) {
+  const byNight = new Map<string, Map<string, Ranked[]>>();
+  for (const agent of streaming.freeAgents) {
     const worth = nightly(
       agent.score,
       clubNights(agent.teamAbbrev, schedule),
@@ -322,40 +342,62 @@ function streams(
       agent.shares ?? null,
     );
     for (const [date, value] of worth) {
-      const positions = byNight.get(date) ?? new Map<string, number[]>();
+      const positions = byNight.get(date) ?? new Map<string, Ranked[]>();
       byNight.set(date, positions);
       for (const position of agent.positions) {
-        const values = positions.get(position);
-        if (values) {
-          values.push(value);
+        const pool = positions.get(position);
+        if (pool) {
+          pool.push({ agent, worth: value });
         } else {
-          positions.set(position, [value]);
+          positions.set(position, [{ agent, worth: value }]);
         }
       }
     }
   }
   const fills = new Map<string, readonly Fill[]>();
   for (const [date, positions] of byNight) {
-    const tonight: Fill[] = [];
-    for (const [position, values] of positions) {
-      values.sort((a, b) => b - a);
-      values
-        .slice(STREAM_RANK - 1, STREAM_RANK - 1 + held)
-        .filter((value) => value > 0)
-        .forEach((worth) => tonight.push({ positions: [position], worth }));
+    const picked = new Map<string, Fill>();
+    for (const pool of positions.values()) {
+      pool.sort((a, b) => b.worth - a.worth);
+      for (const { agent, worth } of pool.slice(STREAM_RANK - 1, STREAM_RANK - 1 + held)) {
+        if (worth > 0) {
+          picked.set(agent.playerId, { positions: agent.positions, worth });
+        }
+      }
     }
+    const tonight = [...picked.values()];
     tonight.sort((a, b) => b.worth - a.worth);
     fills.set(date, tonight);
   }
+  weighedPools.set(streaming, { schedule, weights, held, fills });
+  return fills;
+}
+
+/**
+ * The streaming spots over the rest of the season: as many as the streamers held, each night's
+ * fills, and when the players on injured reserve take spots back: on the first of the nights the
+ * lineup seats each of them, so a spot is never streamed on a night he plays.
+ */
+function streams(
+  team: readonly TeamPlayer[],
+  held: number,
+  streaming: Streaming,
+  schedule: ReadonlyMap<string, readonly string[]>,
+  weights: NightWeights,
+): Streams {
+  if (held === 0) {
+    return NO_STREAMS;
+  }
   const returns = new Map<string, string>();
   for (const player of team.filter((member) => member.reserve)) {
-    const back = [...nightsBack(player, clubNights(player.teamAbbrev, schedule))];
+    const club = clubNights(player.teamAbbrev, schedule);
+    const back = [...(player.out ? nightsBack(player, club) : club)];
     back.sort((a, b) => a.localeCompare(b));
     if (back.length > 0) {
       returns.set(player.playerId, back[0]);
     }
   }
-  return { held, returns, fills };
+  return { held, returns, fills: fillsOf(streaming, held, schedule, weights) };
 }
 
 /** The same spots, one fewer: the lineup once a streamer's spot holds somebody for the season. */
@@ -425,7 +467,7 @@ export function valueLineup(
   const players = seatables(team, schedule, score, weights).filter(
     (player) => !held.has(player.playerId),
   );
-  const spots = streams(team, held.size, streaming.freeAgents, schedule, weights);
+  const spots = streams(team, held.size, streaming, schedule, weights);
   const nights = allNights(schedule);
   const starts = new Map<string, number>();
   const values = new Map<string, number>();
@@ -526,7 +568,7 @@ export function priceDrop(
   const players = seatables(team, schedule, score, weights).filter(
     (player) => !held.has(player.playerId),
   );
-  const spots = streams(team, held.size, streaming.freeAgents, schedule, weights);
+  const spots = streams(team, held.size, streaming, schedule, weights);
   const streamerDropped = held.has(drop.playerId);
   const without = streamerDropped
     ? players

@@ -552,8 +552,6 @@ describe('ScoutTableComponent', () => {
       }).point.componentInstance.gainTip();
 
     expect(tip(false)).not.toContain('streamer');
-    expect(tip(true)).toContain(
-      'An open lineup spot counts at what a streamer would score in it that night',
-    );
+    expect(tip(true)).toContain(', an open lineup spot at what a streamer would score');
   });
 });

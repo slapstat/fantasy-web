@@ -421,9 +421,7 @@ export class ScoutTableComponent {
   /** What the lineup column stands for, in its heading's tooltip. */
   gainTip(): string {
     const tip = `What your lineup gains over the rest of the season by picking him up and dropping ${this.dropName()}: only the nights he would start count`;
-    return this.streaming()
-      ? `${tip}. An open lineup spot counts at what a streamer would score in it that night`
-      : tip;
+    return this.streaming() ? `${tip}, an open lineup spot at what a streamer would score` : tip;
   }
 
   /** What the projection column stands for, in its heading's tooltip. */

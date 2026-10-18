@@ -375,15 +375,11 @@ export class PlayerScoutComponent {
       : 'Projected Z-Score for the rest of the season. Zero is the last player a league this size would roster.',
   );
 
-  readonly dropCostTip = computed(() => {
-    const tip =
-      this.scoringType() === 'points'
-        ? 'The total points your team would lose if you dropped this player.'
-        : 'The total Z-Score your team would lose if you dropped this player.';
-    return this.streaming()
-      ? `${tip} For a streamer, what his streaming spot would score over the rest of the season.`
-      : tip;
-  });
+  readonly dropCostTip = computed(() =>
+    this.scoringType() === 'points'
+      ? 'The total points your team would lose if you dropped this player.'
+      : 'The total Z-Score your team would lose if you dropped this player.',
+  );
 
   readonly categories = computed<readonly ScoringStatKey[]>(() => [
     ...this.scoring().activeScoringColumns,
@@ -779,7 +775,7 @@ export class PlayerScoutComponent {
       .sort(
         (a, b) =>
           Number(a.player.reserve) - Number(b.player.reserve) ||
-          Number(a.score === null) - Number(b.score === null) ||
+          Number(a.score === null && !a.streamer) - Number(b.score === null && !b.streamer) ||
           Number(!a.weighed) - Number(!b.weighed) ||
           (a.value?.marginal ?? a.score ?? 0) - (b.value?.marginal ?? b.score ?? 0) ||
           (a.score ?? 0) - (b.score ?? 0),
