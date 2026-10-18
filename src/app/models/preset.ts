@@ -33,26 +33,17 @@ export interface Preset {
    * why the mark is not shown in a build that has no way to charge for it.
    */
   readonly premium?: boolean;
-  /** A line under the name, where the name alone does not tell two presets apart. */
-  readonly meta?: string;
 }
 
 /** Every preset the picker knows of. What the draft start page offers is its `availablePresets`. */
 export const PRESETS: readonly Preset[] = [
   { id: 'last_season', name: LAST_SEASON_PRESET_NAME, source: 'default' },
-  {
-    id: 'model',
-    name: MODEL_PRESET_NAME,
-    source: 'model',
-    premium: true,
-    meta: 'The whole season',
-  },
+  { id: 'model', name: MODEL_PRESET_NAME, source: 'model', premium: true },
   {
     id: 'rest_of_season',
     name: REST_OF_SEASON_PRESET_NAME,
     source: 'rest_of_season',
     premium: true,
-    meta: 'Only the games left to play',
   },
 ];
 

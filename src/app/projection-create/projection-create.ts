@@ -76,24 +76,16 @@ export interface CreatePreset {
    * mark out of a build that has no way to charge for it.
    */
   readonly premium?: boolean;
-  /** A line under the name, where the name alone does not tell two presets apart. */
-  readonly meta?: string;
 }
 
 /**
  * Every preset this page knows of, in the order its cards are drawn. What it offers is
- * `offeredPresets` of these — see below. The two AI presets are the same model at two lengths, so
- * each says which under its name, as the draft picker's cards do.
+ * `offeredPresets` of these — see below.
  */
 export const CREATE_PRESETS: readonly CreatePreset[] = [
   { name: "Last Season's Stats", source: 'default' },
-  { name: 'AI Projection', source: 'model', premium: true, meta: 'The whole season' },
-  {
-    name: 'AI Rest of Season',
-    source: 'rest_of_season',
-    premium: true,
-    meta: 'Only the games left to play',
-  },
+  { name: 'AI Projection', source: 'model', premium: true },
+  { name: 'AI Rest of Season', source: 'rest_of_season', premium: true },
   { name: 'From Scratch', source: 'blank' },
 ];
 

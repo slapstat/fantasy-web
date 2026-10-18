@@ -452,15 +452,13 @@ describe('DraftStartComponent', () => {
     expect(component.presets().map((preset) => preset.id)).toEqual(['last_season', 'model']);
   });
 
-  it('tells the two AI presets apart under their names', async () => {
+  /** The names say it: "AI Projection" and "AI Rest of Season" need no line under them. */
+  it('puts no line under a preset name', async () => {
     restOfSeasonAvailable.set(true);
     listAll.mockReturnValue(of([]));
     const fixture = await renderFixture();
 
-    expect(texts(fixture, '.row-meta')).toEqual([
-      'The whole season',
-      'Only the games left to play',
-    ]);
+    expect(texts(fixture, '.row-meta')).toEqual([]);
   });
 
   /**
