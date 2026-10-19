@@ -377,6 +377,8 @@ describe('PlayerScoutComponent', () => {
     await fixture.whenStable();
     page.sortBy('change:goals');
     expect(page.orderText()).toBe('Sorted by the change in Goals vs 7 Oct');
+    page.sortBy('rise');
+    expect(page.orderText()).toBe('Sorted by the change in Rank vs 7 Oct');
     page.sortBy('games');
     page.clearCompare();
     expect(page.sort()).toEqual({ key: 'games', descending: true });
@@ -979,6 +981,9 @@ describe('PlayerScoutComponent', () => {
 
     expect(page.sinceLabel()).toBe('no earlier projection');
     expect(page.sinceCaption()).toEqual('No earlier projection to compare with yet.');
+    // The list is sorted by the change, but there is no day to say it is against.
+    expect(page.sort()).toEqual({ key: 'delta', descending: true });
+    expect(page.orderText()).toBe('');
   });
 
   it('switches the comparison on with the day picked, and off with the day kept', async () => {

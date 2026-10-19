@@ -48,18 +48,27 @@ describe('the day arithmetic', () => {
 });
 
 describe('sinceCaption', () => {
-  it('says only when there is nothing to compare with, since the menu offers no other day that cannot answer', () => {
+  it('says when there is nothing to compare with, and nothing until the answer lands', () => {
     expect(sinceCaption({ kind: 'NONE' })).toEqual('No earlier projection to compare with yet.');
-    expect(
-      sinceCaption({
-        requested: '2026-10-07',
-        kind: 'SNAPSHOT',
-        resolved: '2026-10-05',
-        earliestSnapshot: '2026-10-01',
-      }),
-    ).toBe('');
-    expect(sinceCaption({ requested: '2026-10-07', kind: 'PRESEASON' })).toBe('');
     expect(sinceCaption(null)).toBe('');
+  });
+
+  it('says when a nearer day answered than the one asked for: a gap in the kept days', () => {
+    const kept = {
+      requested: '2026-10-17',
+      kind: 'SNAPSHOT' as const,
+      resolved: '2026-10-17',
+      earliestSnapshot: '2026-10-14',
+    };
+    expect(sinceCaption(kept)).toBe('');
+    expect(sinceCaption({ ...kept, resolved: '2026-10-16' })).toEqual(
+      'Compared with 16 Oct, the nearest day kept.',
+    );
+  });
+
+  it('says nothing for the preseason, which the button already names', () => {
+    expect(sinceCaption({ kind: 'PRESEASON' })).toBe('');
+    expect(sinceCaption({ requested: '2026-10-07', kind: 'PRESEASON' })).toBe('');
   });
 });
 

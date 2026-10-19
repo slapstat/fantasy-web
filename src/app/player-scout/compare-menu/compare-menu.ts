@@ -72,12 +72,27 @@ export function relativeDay(day: string, today: string): string {
 }
 
 /**
- * The line under the control when the comparison has nothing to compare with. Every other way
- * the day asked for could differ from the day answered went with the segments: the menu offers
- * no day that is not kept, so the day on the button is the day in the columns.
+ * The line under the control when the day on the button is not the day in the columns: nothing
+ * to compare with at all, or a nearer day answered than the one asked for. The menu offers no
+ * day before the first kept, so the second is only a gap in the kept days (a night the snapshot
+ * never ran), but it is a gap the reader cannot see, so the line stays.
  */
 export function sinceCaption(answer: ScoutSince | null): string {
-  return answer?.kind === 'NONE' ? 'No earlier projection to compare with yet.' : '';
+  if (!answer) {
+    return '';
+  }
+  if (answer.kind === 'NONE') {
+    return 'No earlier projection to compare with yet.';
+  }
+  if (
+    answer.kind === 'SNAPSHOT' &&
+    answer.resolved &&
+    answer.requested &&
+    answer.resolved !== answer.requested
+  ) {
+    return `Compared with ${formatDay(answer.resolved)}, the nearest day kept.`;
+  }
+  return '';
 }
 
 /** One line of the menu: what the comparison can be with. */

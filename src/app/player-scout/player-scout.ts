@@ -1024,7 +1024,8 @@ export class PlayerScoutComponent {
    * Oct". Empty in any other order, which the headings say for themselves.
    */
   readonly orderText = computed(() => {
-    if (!this.compare()) {
+    const answer = this.sinceAnswer();
+    if (!answer || answer.kind === 'NONE') {
       return '';
     }
     const what = this.changeName(this.sort().key);
@@ -1037,7 +1038,7 @@ export class PlayerScoutComponent {
       return this.scoreHeading();
     }
     if (key === 'rise') {
-      return 'rank';
+      return 'Rank';
     }
     const figure = changeOf(key);
     if (figure === 'games') {
