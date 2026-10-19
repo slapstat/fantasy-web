@@ -35,11 +35,6 @@ const ANSWER: PlayerScoutListResponse = {
       gamesRemaining: 78,
       now: { games: 70, stats: { points: 48.5, ppp: 19, toiPerGame: 1380 } },
       then: { games: 74.3, stats: { points: 27.9, toiPerGame: 1050 } },
-      usage: {
-        recent: { games: 4, toiPerGame: 1380, ppShare: 0.85 },
-        baseline: { games: 6, toiPerGame: 1050, ppShare: 0.2 },
-        baselineSource: 'SEASON',
-      },
     },
     {
       playerId: '6743',
