@@ -353,37 +353,51 @@
       }
       <!-- Skaters and goalies are one list, narrowed by any number of positions at once. "All" is
            the list with none picked, and the way back to it; "All skaters" picks the four skater
-           positions in one press. -->
-      <div class="pills positions" role="group" aria-label="Positions to show">
-        <button
-          type="button"
-          class="pill"
-          [class.pill--active]="positions().size === 0"
-          [attr.aria-pressed]="positions().size === 0"
-          (click)="clearPositions()"
-        >
-          All
-        </button>
-        <button
-          type="button"
-          class="pill"
-          [class.pill--active]="allSkaters()"
-          [attr.aria-pressed]="allSkaters()"
-          (click)="toggleAllSkaters()"
-        >
-          All skaters
-        </button>
-        @for (option of positionOptions; track option) {
+           positions in one press. The search beside them narrows the same list to a name. -->
+      <div class="list-tools">
+        <div class="pills positions" role="group" aria-label="Positions to show">
           <button
             type="button"
             class="pill"
-            [class.pill--active]="positions().has(option)"
-            [attr.aria-pressed]="positions().has(option)"
-            (click)="togglePosition(option)"
+            [class.pill--active]="positions().size === 0"
+            [attr.aria-pressed]="positions().size === 0"
+            (click)="clearPositions()"
           >
-            {{ option }}
+            All
           </button>
-        }
+          <button
+            type="button"
+            class="pill"
+            [class.pill--active]="allSkaters()"
+            [attr.aria-pressed]="allSkaters()"
+            (click)="toggleAllSkaters()"
+          >
+            All skaters
+          </button>
+          @for (option of positionOptions; track option) {
+            <button
+              type="button"
+              class="pill"
+              [class.pill--active]="positions().has(option)"
+              [attr.aria-pressed]="positions().has(option)"
+              (click)="togglePosition(option)"
+            >
+              {{ option }}
+            </button>
+          }
+        </div>
+        <label class="search-field">
+          <app-icon name="search" [size]="16" class="search-icon" />
+          <input
+            type="search"
+            class="search-input"
+            placeholder="Search player…"
+            aria-label="Search free agents by name"
+            maxlength="100"
+            [value]="search()"
+            (input)="setSearch($event)"
+          />
+        </label>
       </div>
       <!-- A category matchup is mostly settled before the week is out: the add worth making is
            the one that swings the categories still open. Picking them ranks the players who score
