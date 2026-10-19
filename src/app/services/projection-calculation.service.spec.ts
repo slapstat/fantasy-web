@@ -176,6 +176,21 @@ describe('ProjectionCalculationService.computeZScores', () => {
     });
   });
 
+  it("puts nought at the pool size's best player even when the pool's worst is below him", () => {
+    // The two busiest goalies make the pool, the second of them with ratios nobody would roster.
+    const field = [
+      goalieSeason(1, 60, 2.3, 0.92),
+      goalieSeason(2, 59, 3.4, 0.88),
+      goalieSeason(3, 30, 2.6, 0.91),
+    ];
+
+    const result = service.computeZScores(field, GOALIE_RATIOS, 180, 2);
+
+    expect(result[2]).toBeCloseTo(0, 10);
+    expect(result[0]).toBeGreaterThan(0);
+    expect(result[1]).toBeLessThan(0);
+  });
+
   it('returns an empty array for no projections', () => {
     const result = service.computeZScores([], new Set(['goals']));
 
@@ -415,6 +430,90 @@ describe('ProjectionCalculationService ratio categories', () => {
         10,
       );
     });
+  });
+});
+
+describe('ProjectionCalculationService goalie pool', () => {
+  let service: ProjectionCalculationService;
+
+  beforeEach(() => {
+    service = new ProjectionCalculationService();
+  });
+
+  const withWins = (line: GoalieProjection, w: number): GoalieProjection =>
+    goalie(line.playerId, { ...line.stats.scoring, w }, line.stats.utility.gp);
+
+  // A rest-of-season board in miniature, for a league rostering 24: 24 starters, their games and
+  // save percentages out of step so volume and rate do not rank them alike, 30 backups, and 24
+  // goalies out or in the minors with a game or none left.
+  const STARTERS = 24;
+  const starterWins: number[] = [];
+  const restOfSeason = (): GoalieProjection[] => {
+    starterWins.length = 0;
+    const starters = Array.from({ length: STARTERS }, (_unused, index) => {
+      const gp = 58 - Math.floor((index * 18) / (STARTERS - 1));
+      const svPct = +(0.914 - ((index * 7) % STARTERS) * (0.024 / STARTERS)).toFixed(3);
+      const wins = +(gp * (0.42 + (svPct - 0.89) * 4)).toFixed(1);
+      starterWins.push(wins);
+      return withWins(
+        goalieSeason(index + 1, gp, +(2.3 + (0.914 - svPct) * 30).toFixed(2), svPct),
+        wins,
+      );
+    });
+    const backups = Array.from({ length: 30 }, (_unused, index) => {
+      const gp = 25 - Math.floor((index * 20) / 29);
+      const svPct = +(0.905 - (index % 5) * 0.004).toFixed(3);
+      const gaa = +(2.6 + (0.905 - svPct) * 30).toFixed(2);
+      return withWins(goalieSeason(100 + index, gp, gaa, svPct), +(gp * 0.45).toFixed(1));
+    });
+    const idle = Array.from({ length: 24 }, (_unused, index) =>
+      index % 2 === 0
+        ? goalie(200 + index, {}, 0)
+        : withWins(goalieSeason(200 + index, 1, 2.9, 0.89), 0.4),
+    );
+    return [...starters, ...backups, ...idle];
+  };
+  const categories = new Set<ScoringStatKey>(['w', 'gaa', 'svPct']);
+
+  it('keeps the starters as the pool when many goalies have a game or none left', () => {
+    const scores = service.computeZScores(restOfSeason(), categories, 180, STARTERS);
+
+    // Picked by value, a goalie with no games scores the pool's average on both ratios, outscores
+    // a busy starter whose ratios are under the pool's, takes his seat and drags the pool's spread
+    // in, until the pool is goalies who do not play and the z-scores run to minus thirty.
+    const idle = scores.slice(STARTERS + 30);
+    expect(Math.min(...scores.slice(0, STARTERS))).toBeGreaterThan(Math.max(...idle));
+    expect([...scores].sort((first, second) => second - first)[STARTERS - 1]).toBeCloseTo(0, 10);
+  });
+
+  it("measures the wins' spread over the goalies who play", () => {
+    const contributions = service.computeZScoreContributions(
+      restOfSeason(),
+      categories,
+      180,
+      STARTERS,
+    );
+    const mean = starterWins.reduce((total, value) => total + value, 0) / STARTERS;
+    const stdDev = Math.sqrt(
+      starterWins.reduce((total, value) => total + (value - mean) ** 2, 0) / STARTERS,
+    );
+
+    expect(contributions[0]['w'] - contributions[1]['w']).toBeCloseTo(
+      (starterWins[0] - starterWins[1]) / stdDev,
+      10,
+    );
+  });
+
+  it('settles a tie in games at the edge of the pool by value', () => {
+    const field = [24, 30, 36, 18, 28].map((w, index) =>
+      withWins(goalieSeason(index + 1, 60, 2.7, 0.905), w),
+    );
+
+    const scores = service.computeZScores(field, new Set<ScoringStatKey>(['w']), 180, 3);
+
+    // Every goalie plays sixty, so the pool is the three with the most wins, and the third is nought.
+    expect(scores[0]).toBeCloseTo(-4 / Math.sqrt(104 / 9), 10);
+    expect(scores[4]).toBeCloseTo(0, 10);
   });
 });
 

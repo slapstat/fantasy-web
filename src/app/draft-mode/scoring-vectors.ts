@@ -177,6 +177,44 @@ function buildPool(): ScoringVectorPlayer[] {
   return players;
 }
 
+/**
+ * The same pool a month into the season: five more goalies out or in the minors with no games
+ * left, and three called up for a game or three. Picked by value, goalies like these took the
+ * goalie pool and ran the z-scores to minus thirty.
+ */
+function withIdleGoalies(pool: ScoringVectorPlayer[]): ScoringVectorPlayer[] {
+  const idle = Array.from({ length: 8 }, (_unused, index): ScoringVectorPlayer => {
+    const games = Math.max(0, index - 4);
+    const shotsAgainst = games * 28;
+    const goalsAgainst = +(shotsAgainst * 0.105).toFixed(2);
+    const wins = Math.round(games / 2);
+    return {
+      playerId: 200 + index,
+      type: 'goalie',
+      name: `Idle goalie ${200 + index}`,
+      positions: ['G'],
+      stats: {
+        scoring: {
+          gs: games,
+          w: wins,
+          l: games - wins,
+          otl: 0,
+          sho: 0,
+          sa: shotsAgainst,
+          sv: shotsAgainst - goalsAgainst,
+          ga: goalsAgainst,
+          gaa: games > 0 ? +(goalsAgainst / games).toFixed(3) : 0,
+          svPct: games > 0 ? 0.895 : 0,
+          winPct: games > 0 ? +(wins / games).toFixed(3) : 0,
+          toi: games * 3600,
+        },
+        utility: { gp: games },
+      },
+    };
+  });
+  return [...pool, ...idle];
+}
+
 function picksFor(pool: ScoringVectorPlayer[], teamCount: number, rounds: number) {
   const skaters = pool.filter((player) => player.type === 'skater');
   const goalies = pool.filter((player) => player.type === 'goalie');
@@ -235,6 +273,7 @@ const FORWARDS_ONLY_ROSTER_SLOTS: RosterSlots = {
 export function scoringVectorCases(): ScoringVectorCase[] {
   const pool = buildPool();
   const teams = picksFor(pool, 4, 6);
+  const inSeasonPool = withIdleGoalies(pool);
   return [
     {
       name: 'points league',
@@ -316,6 +355,19 @@ export function scoringVectorCases(): ScoringVectorCase[] {
       },
       pool,
       teams,
+    },
+    {
+      name: 'category league with idle goalies',
+      league: {
+        scoringType: 'category',
+        statWeights: { goals: 1, assists: 1, sog: 1, hits: 1, w: 1, gaa: 1, svPct: 1 },
+        activeScoringColumns: ['goals', 'assists', 'sog', 'hits', 'w', 'gaa', 'svPct'],
+        rosterSlots: ROSTER_SLOTS,
+        leagueSize: 4,
+        minGoalieGames: 0,
+      },
+      pool: inSeasonPool,
+      teams: picksFor(inSeasonPool, 4, 6),
     },
   ];
 }
