@@ -13,6 +13,7 @@ import {
   dropShare,
   formatGames,
   formatToi,
+  filterByName,
   filterByPositions,
   lineColumns,
   lineStats,
@@ -113,6 +114,34 @@ const TEAMS: TeamSchedule[] = [
     })),
   },
 ];
+
+describe('filterByName', () => {
+  const rows = [
+    ranked(skater('Juraj Slafkovský', ['LW']), 1),
+    ranked(skater('Jack Hughes', ['C']), 2),
+    ranked(skater('Quinn Hughes', ['D']), 3),
+  ];
+
+  it('keeps every player while nothing is searched for', () => {
+    expect(filterByName(rows, '  ')).toBe(rows);
+  });
+
+  it('keeps the players whose name holds the text, in ranked order, whatever its case', () => {
+    expect(filterByName(rows, ' HUGH ').map((row) => [row.player.name, row.rank])).toEqual([
+      ['Jack Hughes', 2],
+      ['Quinn Hughes', 3],
+    ]);
+  });
+
+  it('finds a name written with accents from one written without, and the other way round', () => {
+    expect(filterByName(rows, 'slafkovsky').map((row) => row.player.name)).toEqual([
+      'Juraj Slafkovský',
+    ]);
+    expect(
+      filterByName([ranked(skater('Juraj Slafkovsky', ['LW']), 1)], 'Slafkovský'),
+    ).toHaveLength(1);
+  });
+});
 
 describe('filterByPositions', () => {
   const rows = [

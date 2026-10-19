@@ -51,6 +51,7 @@ import {
   categoryColumn,
   addShares,
   dropShare,
+  filterByName,
   filterByPositions,
   LineColumn,
   nightsShare,
@@ -1177,11 +1178,21 @@ export class StreamerPlannerComponent {
 
   readonly sortedRoster = computed(() => sortRoster(this.roster(), this.rosterSort()));
 
+  /** The text the free agents are searched by name for; empty is everyone, as the page opens. */
+  readonly search = signal('');
+
+  setSearch(event: Event): void {
+    this.search.set((event.target as HTMLInputElement).value);
+  }
+
   /**
-   * The list on screen: skaters and goalies together, narrowed to the positions picked. Each keeps
-   * his place in the whole list, so one narrowed to a position still says how it compares.
+   * The list on screen: skaters and goalies together, narrowed to the positions picked and to the
+   * name searched for. Each keeps his place in the whole list, so one narrowed still says how it
+   * compares.
    */
-  readonly filtered = computed(() => filterByPositions(this.ranked(), this.positions()));
+  readonly filtered = computed(() =>
+    filterByName(filterByPositions(this.ranked(), this.positions()), this.search()),
+  );
 
   // --- The order of the list --------------------------------------------------------------------
 
@@ -1209,11 +1220,17 @@ export class StreamerPlannerComponent {
   readonly sorted = computed(() => sortFreeAgents(this.filtered(), this.sort()));
 
   /** Why the list on screen has nobody in it, though the league has players available. */
-  readonly emptyText = computed(() =>
-    this.positions().size > 0
+  readonly emptyText = computed(() => {
+    const search = this.search().trim();
+    if (search) {
+      return this.positions().size > 0
+        ? `No available player at these positions matches "${search}".`
+        : `No available player matches "${search}".`;
+    }
+    return this.positions().size > 0
       ? 'No available player at these positions has a projection.'
-      : 'No available player has a projection in these categories.',
-  );
+      : 'No available player has a projection in these categories.';
+  });
 
   // --- The pages of the list --------------------------------------------------------------------
 
@@ -1223,11 +1240,11 @@ export class StreamerPlannerComponent {
   readonly pageSize = linkedSignal(() => readPageSize(this.layout()));
 
   /**
-   * The page asked for, counted from 0. Other positions, other categories or another order are
-   * another list, so it opens on its first page again.
+   * The page asked for, counted from 0. Other positions, another search, other categories or
+   * another order are another list, so it opens on its first page again.
    */
   private readonly page = linkedSignal<unknown, number>({
-    source: () => [this.positions(), this.focus(), this.sort()],
+    source: () => [this.positions(), this.search(), this.focus(), this.sort()],
     computation: () => 0,
   });
 
