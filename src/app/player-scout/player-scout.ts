@@ -698,18 +698,21 @@ export class PlayerScoutComponent {
 
   /**
    * The streamers and the free agents their spots fill from: every free agent in the league,
-   * whatever the list is narrowed to, and none on waivers, who cannot be streamed tonight.
+   * whatever the list is narrowed to, and none on waivers, who cannot be streamed tonight. The
+   * spots stream within the league's weekly add limit, and every night where none is known.
    */
   private readonly streamPool = computed<Streaming>(() => {
     if (!this.streaming()) {
       return NO_STREAMING;
     }
     const units = this.units();
+    const settings = this.settingsResource.hasValue() ? this.settingsResource.value() : null;
     return {
       streamers: this.streamerMarks(),
       freeAgents: this.ranked()
         .filter((row) => row.scout.owner === null && row.player.availability === 'FREE_AGENT')
         .map((row) => this.pickupOf(row, units)),
+      weeklyAdds: settings?.maxWeeklyAdds ?? null,
     };
   });
 

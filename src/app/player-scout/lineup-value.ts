@@ -22,9 +22,10 @@ import { lineupSeats, Seat, seating } from '../streamer-planner/planner-lineup';
  *
  * <p>A manager who streams holds a spot or two for players picked up for a few nights of good
  * schedule ({@link Streaming}). Such a player is not part of the season's lineup: he is a spot,
- * which each night seats a free agent who plays then, so an open seat is worth what a streamer
- * would score in it, and a player who plays on a quiet night leaves the busy night's seat to the
- * spot.
+ * which seats a free agent who plays then, so an open seat is worth what a streamer would score in
+ * it, and a player who plays on a quiet night leaves the busy night's seat to the spot. With no
+ * weekly add limit a spot seats a new free agent every night; under one, each add holds its free
+ * agent for his club's games until the spot's next add, and a week's adds go where they add most.
  */
 export interface LineupValue {
   readonly playerId: string;
@@ -131,16 +132,22 @@ export const STREAM_RANK = 3;
 
 /**
  * The spots a manager holds for streamers, and the free agents they are filled from. Each player
- * held as a streamer is one spot, and leaves the season's lineup: on every night a spot seats a
- * free agent who plays then, at his worth that night, in a seat no better player of the user's
- * takes. A player on injured reserve takes a spot back once he returns, since he needs a roster
- * spot again, and the streaming spot is the one a manager gives up.
+ * held as a streamer is one spot, and leaves the season's lineup: a spot seats a free agent who
+ * plays, at his worth that night, in a seat no better player of the user's takes. A player on
+ * injured reserve takes a spot back once he returns, since he needs a roster spot again, and the
+ * streaming spot is the one a manager gives up.
  */
 export interface Streaming {
   /** The user's players held as streamers, by platform id. */
   readonly streamers: ReadonlySet<string>;
   /** The free agents a spot is filled from, each read as a pickup is. */
   readonly freeAgents: readonly Pickup[];
+  /**
+   * How many players the league lets a team add in a fantasy week, Monday to Sunday, all its
+   * spots together. Left out or null when there is no limit, and a spot then seats a new free
+   * agent every night.
+   */
+  readonly weeklyAdds?: number | null;
 }
 
 /** No spot held for streamers: the season's lineup is the whole roster, an open seat worth nothing. */
@@ -303,6 +310,45 @@ interface Ranked {
   readonly worth: number;
 }
 
+/** A free agent as the nights weigh him: what a game of his is worth on each of his club's. */
+interface Weighed {
+  readonly agent: Pickup;
+  readonly worth: ReadonlyMap<string, number>;
+}
+
+/** The last pool weighed, with what it was weighed from, as {@link weighedPools} keeps fills. */
+const weighedAgents = new WeakMap<
+  Streaming,
+  {
+    readonly schedule: ReadonlyMap<string, readonly string[]>;
+    readonly weights: NightWeights;
+    readonly agents: readonly Weighed[];
+  }
+>();
+
+/** Every free agent in the pool weighed over his club's nights. */
+function agentsOf(
+  streaming: Streaming,
+  schedule: ReadonlyMap<string, readonly string[]>,
+  weights: NightWeights,
+): readonly Weighed[] {
+  const kept = weighedAgents.get(streaming);
+  if (kept?.schedule === schedule && kept.weights === weights) {
+    return kept.agents;
+  }
+  const agents = streaming.freeAgents.map((agent) => ({
+    agent,
+    worth: nightly(
+      agent.score,
+      clubNights(agent.teamAbbrev, schedule),
+      weights.worth.get(nhlTeamKey(agent.teamAbbrev) ?? ''),
+      agent.shares ?? null,
+    ),
+  }));
+  weighedAgents.set(streaming, { schedule, weights, agents });
+  return agents;
+}
+
 /**
  * The last fills worked out for each pool, with what they were worked out from: the roster's
  * valuation and every repricing of the list (a search, a filter) ask for the same ones, and the
@@ -334,13 +380,7 @@ function fillsOf(
     return kept.fills;
   }
   const byNight = new Map<string, Map<string, Ranked[]>>();
-  for (const agent of streaming.freeAgents) {
-    const worth = nightly(
-      agent.score,
-      clubNights(agent.teamAbbrev, schedule),
-      weights.worth.get(nhlTeamKey(agent.teamAbbrev) ?? ''),
-      agent.shares ?? null,
-    );
+  for (const { agent, worth } of agentsOf(streaming, schedule, weights)) {
     for (const [date, value] of worth) {
       const positions = byNight.get(date) ?? new Map<string, Ranked[]>();
       byNight.set(date, positions);
@@ -374,9 +414,10 @@ function fillsOf(
 }
 
 /**
- * The streaming spots over the rest of the season: as many as the streamers held, each night's
- * fills, and when the players on injured reserve take spots back: on the first of the nights the
- * lineup seats each of them, so a spot is never streamed on a night he plays.
+ * The streaming spots over the rest of the season: as many as the streamers held, and when the
+ * players on injured reserve take spots back: on the first of the nights the lineup seats each of
+ * them, so a spot is never streamed on a night he plays. With no weekly add limit, each night's
+ * fills too; under one, the fills wait for the lineup they are planned around ({@link filled}).
  */
 function streams(
   team: readonly TeamPlayer[],
@@ -397,12 +438,281 @@ function streams(
       returns.set(player.playerId, back[0]);
     }
   }
-  return { held, returns, fills: fillsOf(streaming, held, schedule, weights) };
+  return {
+    held,
+    returns,
+    fills: limited(streaming) ? new Map() : fillsOf(streaming, held, schedule, weights),
+  };
 }
 
 /** The same spots, one fewer: the lineup once a streamer's spot holds somebody for the season. */
 function oneFewer(streams: Streams): Streams {
   return { ...streams, held: Math.max(0, streams.held - 1) };
+}
+
+/** Whether the league caps a week's adds, so a spot cannot take a new free agent every night. */
+function limited(streaming: Streaming): boolean {
+  return streaming.weeklyAdds !== undefined && streaming.weeklyAdds !== null;
+}
+
+/** What a week's adds are planned from, besides the spots and the players they are planned around. */
+interface Planning {
+  readonly team: readonly TeamPlayer[];
+  readonly slots: RosterSlots;
+  readonly seats: readonly Seat[];
+  readonly schedule: ReadonlyMap<string, readonly string[]>;
+  readonly score: (playerId: string) => number | null;
+  readonly weights: NightWeights;
+  readonly streaming: Streaming;
+}
+
+/**
+ * The plans made for each pool, with what they were made from, as {@link weighedPools} keeps
+ * fills: the roster's valuation and every repricing of the list ask for the same plans, by the
+ * spots and the players they are planned around, until the roster or the pool changes.
+ */
+const plannedPools = new WeakMap<
+  Streaming,
+  { readonly from: Planning; readonly plans: Map<string, ReadonlyMap<string, readonly Fill[]>> }
+>();
+
+/**
+ * The spots with their fills for this lineup: as {@link streams} left them with no weekly add
+ * limit, and under one, the week's adds planned around these players ({@link planned}).
+ */
+function filled(streams: Streams, core: readonly Seatable[], planning: Planning): Streams {
+  const { streaming, schedule, weights } = planning;
+  if (streams.held === 0 || !limited(streaming)) {
+    return streams;
+  }
+  let kept = plannedPools.get(streaming);
+  if (
+    kept?.from.team !== planning.team ||
+    kept.from.slots !== planning.slots ||
+    kept.from.schedule !== schedule ||
+    kept.from.score !== planning.score ||
+    kept.from.weights !== weights
+  ) {
+    kept = { from: planning, plans: new Map() };
+    plannedPools.set(streaming, kept);
+  }
+  const key = [
+    streams.held,
+    [...streams.returns].map(([playerId, date]) => `${playerId}@${date}`).join(','),
+    core.map((player) => player.playerId).join(','),
+  ].join('|');
+  let fills = kept.plans.get(key);
+  if (!fills) {
+    fills = planned(
+      streams,
+      core,
+      planning.seats,
+      agentsOf(streaming, schedule, weights),
+      Math.max(0, streaming.weeklyAdds ?? 0),
+      allNights(schedule),
+    );
+    kept.plans.set(key, fills);
+  }
+  return { ...streams, fills };
+}
+
+/** The Monday a night's fantasy week starts on. */
+function mondayOf(date: string): string {
+  const day = new Date(`${date}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
+  return day.toISOString().slice(0, 10);
+}
+
+/** The nights, in order, split into fantasy weeks, Monday to Sunday. */
+function weeksOf(nights: readonly string[]): readonly (readonly string[])[] {
+  const weeks = new Map<string, string[]>();
+  for (const date of nights) {
+    const monday = mondayOf(date);
+    const week = weeks.get(monday);
+    if (week) {
+      week.push(date);
+    } else {
+      weeks.set(monday, [date]);
+    }
+  }
+  return [...weeks.values()];
+}
+
+/** A free agent a spot holds from a night on, until its next add. */
+interface Hold {
+  readonly from: string;
+  /** Nobody, for a spot before its first add. */
+  readonly agent: Weighed | null;
+  /** Bought with one of the week's adds, rather than kept on from the week before. */
+  readonly added: boolean;
+}
+
+/** Which of a spot's holds, in order, holds it on the night: the last to start by then. */
+function holdOn(holds: readonly Hold[], date: string): number {
+  let at = 0;
+  while (at + 1 < holds.length && holds[at + 1].from <= date) {
+    at += 1;
+  }
+  return at;
+}
+
+/** An add a spot could make: who, from which night, and for which of the week's nights. */
+interface Add {
+  readonly spot: number;
+  /** The hold he would cut short, by its place in the spot's holds. */
+  readonly at: number;
+  readonly from: string;
+  readonly span: readonly string[];
+  readonly agent: Weighed;
+  /** His own worth over the span: no add can gain the lineup more. */
+  readonly bound: number;
+}
+
+/**
+ * Each night's fills under a weekly add limit. A spot holds one free agent at a time, from the
+ * night he is added on until the spot's next add, and he plays his club's games in between; the
+ * one a spot holds at a week's end is kept into the next. Who an add brings is the free agent a
+ * spot would land for those nights: at a position, of those whose club plays on the night of the
+ * add, the {@link STREAM_RANK}th best over the nights he would be held, passing over those the
+ * other spots hold, since the league's other managers take the best. The week's adds are spent one
+ * at a time, each on the add that raises the lineup's value most, with these players seated best
+ * first as every night is: a greedy pick, not the best plan of the week, and set for these players
+ * alone, so a pickup or a drop is priced against it rather than a plan made anew.
+ */
+function planned(
+  streams: Streams,
+  core: readonly Seatable[],
+  seats: readonly Seat[],
+  agents: readonly Weighed[],
+  adds: number,
+  nights: readonly string[],
+): ReadonlyMap<string, readonly Fill[]> {
+  const positions = [...new Set(agents.flatMap(({ agent }) => agent.positions))];
+  const fills = new Map<string, readonly Fill[]>();
+  let carried: (Weighed | null)[] = Array.from({ length: streams.held }, () => null);
+  for (const week of weeksOf(nights)) {
+    const spots = carried.map((agent): Hold[] => [{ from: week[0], agent, added: false }]);
+    const holderOn = (spot: number, date: string): Weighed | null =>
+      spots[spot][holdOn(spots[spot], date)].agent;
+    const tonight = (date: string, spot = -1, agent: Weighed | null = null): Fill[] => {
+      const seated: Fill[] = [];
+      for (let index = 0; index < Math.min(spots.length, spotsOn(streams, date)); index++) {
+        const holder = index === spot ? agent : holderOn(index, date);
+        const worth = holder?.worth.get(date) ?? 0;
+        if (holder && worth > 0) {
+          seated.push({ positions: holder.agent.positions, worth });
+        }
+      }
+      return seated;
+    };
+    const lineup = (date: string, fill: readonly Fill[]): number =>
+      lineupOn(core, date, seats, fill, spotsOn(streams, date)).value;
+    const value = new Map(week.map((date) => [date, lineup(date, tonight(date))]));
+    const playing = new Map(
+      week.map((date) => [date, agents.filter((weighed) => (weighed.worth.get(date) ?? 0) > 0)]),
+    );
+    const worthOver = (weighed: Weighed, span: readonly string[]): number =>
+      span.reduce((sum, date) => sum + (weighed.worth.get(date) ?? 0), 0);
+    const ranked = new Map<string, readonly Weighed[]>();
+    const landed = (
+      position: string,
+      span: readonly string[],
+      held: ReadonlySet<Weighed>,
+    ): Weighed | null => {
+      const key = `${position}|${span[0]}|${span.length}`;
+      let pool = ranked.get(key);
+      if (!pool) {
+        pool = (playing.get(span[0]) ?? [])
+          .filter(({ agent }) => agent.positions.includes(position))
+          .map((weighed) => ({ weighed, over: worthOver(weighed, span) }))
+          .sort((a, b) => b.over - a.over)
+          .map(({ weighed }) => weighed);
+        ranked.set(key, pool);
+      }
+      let passed = 0;
+      for (const weighed of pool) {
+        if (held.has(weighed)) {
+          continue;
+        }
+        if (passed < STREAM_RANK - 1) {
+          passed += 1;
+          continue;
+        }
+        return weighed;
+      }
+      return null;
+    };
+    for (let spent = 0; spent < adds; spent++) {
+      const held = new Set<Weighed>();
+      for (const holds of spots) {
+        for (const { agent } of holds) {
+          if (agent) {
+            held.add(agent);
+          }
+        }
+      }
+      const options: Add[] = [];
+      const seen = new Set<string>();
+      for (const [spot, holds] of spots.entries()) {
+        for (const [index, date] of week.entries()) {
+          if (spot >= spotsOn(streams, date)) {
+            continue;
+          }
+          const at = holdOn(holds, date);
+          if (holds[at].from === date && holds[at].added) {
+            continue;
+          }
+          const until = at + 1 < holds.length ? week.indexOf(holds[at + 1].from) : week.length;
+          const span = week.slice(index, until);
+          for (const position of positions) {
+            const agent = landed(position, span, held);
+            const key = `${spot}|${date}|${agent?.agent.playerId}`;
+            if (agent && agent !== holds[at].agent && !seen.has(key)) {
+              seen.add(key);
+              options.push({ spot, at, from: date, span, agent, bound: worthOver(agent, span) });
+            }
+          }
+        }
+      }
+      options.sort((a, b) => b.bound - a.bound);
+      let best: Add | null = null;
+      let most = 1e-9;
+      for (const option of options) {
+        if (option.bound <= most) {
+          break;
+        }
+        const before = spots[option.spot][option.at].agent;
+        let gain = 0;
+        for (const date of option.span) {
+          if (option.agent.worth.has(date) || before?.worth.has(date)) {
+            gain += lineup(date, tonight(date, option.spot, option.agent)) - (value.get(date) ?? 0);
+          }
+        }
+        if (gain > most) {
+          best = option;
+          most = gain;
+        }
+      }
+      if (!best) {
+        break;
+      }
+      const hold: Hold = { from: best.from, agent: best.agent, added: true };
+      const holds = spots[best.spot];
+      if (holds[best.at].from === best.from) {
+        holds[best.at] = hold;
+      } else {
+        holds.splice(best.at + 1, 0, hold);
+      }
+      for (const date of best.span) {
+        value.set(date, lineup(date, tonight(date)));
+      }
+    }
+    for (const date of week) {
+      fills.set(date, tonight(date));
+    }
+    carried = spots.map((holds) => holds[holds.length - 1].agent);
+  }
+  return fills;
 }
 
 /**
@@ -418,13 +728,23 @@ function night(
   seats: readonly Seat[],
   streams: Streams = NO_STREAMS,
 ): { readonly starters: readonly Seatable[]; readonly value: number } {
-  const spots = spotsOn(streams, date);
+  return lineupOn(players, date, seats, streams.fills.get(date) ?? [], spotsOn(streams, date));
+}
+
+/** One night's starters as {@link night} sets them, from the night's fills and spots. */
+function lineupOn(
+  players: readonly Seatable[],
+  date: string,
+  seats: readonly Seat[],
+  fills: readonly Fill[],
+  spots: number,
+): { readonly starters: readonly Seatable[]; readonly value: number } {
   // The user's own listed ahead of a fill worth the same, as the sort keeps them.
   const order = [
     ...players
       .filter((player) => player.nights.has(date))
       .map((player) => ({ player, positions: player.positions, worth: worthOn(player, date) })),
-    ...(spots > 0 ? (streams.fills.get(date) ?? []) : []).map((fill) => ({
+    ...(spots > 0 ? fills : []).map((fill) => ({
       player: null,
       ...fill,
     })),
@@ -467,7 +787,9 @@ export function valueLineup(
   const players = seatables(team, schedule, score, weights).filter(
     (player) => !held.has(player.playerId),
   );
-  const spots = streams(team, held.size, streaming, schedule, weights);
+  const planning: Planning = { team, slots, seats, schedule, score, weights, streaming };
+  const pool = streams(team, held.size, streaming, schedule, weights);
+  const spots = filled(pool, players, planning);
   const nights = allNights(schedule);
   const starts = new Map<string, number>();
   const values = new Map<string, number>();
@@ -485,7 +807,8 @@ export function valueLineup(
   const byPlayer = new Map<string, LineupValue>();
   for (const player of players) {
     const others = players.filter((other) => other !== player);
-    const after = withoutReturn(spots, player.playerId);
+    const freed = withoutReturn(pool, player.playerId);
+    const after = freed === pool ? spots : filled(freed, others, planning);
     let lost = 0;
     for (const date of after === spots ? player.nights : nights) {
       if (nightValues.has(date)) {
@@ -502,7 +825,7 @@ export function valueLineup(
     });
   }
   if (held.size > 0) {
-    const fewer = oneFewer(spots);
+    const fewer = filled(oneFewer(pool), players, planning);
     let spot = 0;
     for (const date of nights) {
       spot += (nightValues.get(date) ?? 0) - night(players, date, seats, fewer).value;
@@ -568,12 +891,15 @@ export function priceDrop(
   const players = seatables(team, schedule, score, weights).filter(
     (player) => !held.has(player.playerId),
   );
-  const spots = streams(team, held.size, streaming, schedule, weights);
+  const planning: Planning = { team, slots, seats, schedule, score, weights, streaming };
+  const pool = streams(team, held.size, streaming, schedule, weights);
+  const spots = filled(pool, players, planning);
   const streamerDropped = held.has(drop.playerId);
   const without = streamerDropped
     ? players
     : players.filter((player) => player.playerId !== drop.playerId);
-  const after = streamerDropped ? oneFewer(spots) : withoutReturn(spots, drop.playerId);
+  const freed = streamerDropped ? oneFewer(pool) : withoutReturn(pool, drop.playerId);
+  const after = freed === pool ? spots : filled(freed, without, planning);
   const dropped = players.find((player) => player.playerId === drop.playerId);
   const base = new Map<string, number>();
   const asItStands = (date: string): number => {

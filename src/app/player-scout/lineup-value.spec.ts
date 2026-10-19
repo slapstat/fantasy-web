@@ -416,6 +416,101 @@ describe('streaming spots', () => {
     expect(pricing.gainFor(a)! - pricing.gainFor(b)!).toBeCloseTo(6);
   });
 
+  it('keeps the quiet night ahead when the weekly add limit does not bind', () => {
+    // Four adds for the four nights: each free agent plays one of them, so one add is one night.
+    const four: Streaming = { ...streaming, weeklyAdds: 4 };
+    const valuation = valueLineup(team, UTIL, week, score, EVEN_NIGHTS, four);
+    const pricing = priceDrop(team[2], team, UTIL, week, score, EVEN_NIGHTS, four);
+
+    expect(valuation.total).toBeCloseTo(60 + 15);
+    expect(valuation.byPlayer.get('hughes')?.marginal).toBeCloseTo(15);
+    expect(pricing.gainFor(a)).toBeCloseTo(10 + 6 + 7);
+    expect(pricing.gainFor(b)).toBeCloseTo(4 + 6 + 7);
+  });
+
+  it('spends a binding weekly add limit on the nights it adds most', () => {
+    // Two adds: Tuesday's 6 and Thursday's 4; Monday and Saturday go unstreamed.
+    const two: Streaming = { ...streaming, weeklyAdds: 2 };
+    const valuation = valueLineup(team, UTIL, week, score, EVEN_NIGHTS, two);
+
+    expect(valuation.total).toBeCloseTo(60 + 6 + 4);
+    expect(valuation.byPlayer.get('hughes')?.marginal).toBeCloseTo(10);
+
+    // A takes Monday's open seat and Saturday's whole; B takes Tuesday's from the stream. A stays
+    // ahead by the stream B displaces.
+    const pricing = priceDrop(team[2], team, UTIL, week, score, EVEN_NIGHTS, two);
+    expect(pricing.gainFor(a)).toBeCloseTo(10 + 6 + 10);
+    expect(pricing.gainFor(b)).toBeCloseTo(4 + 6 + 10);
+
+    // Dropping the streamer for a hold costs the spot's two adds, no longer four nights.
+    const swap = priceDrop(team[1], team, UTIL, week, score, EVEN_NIGHTS, two);
+    expect(swap.gainFor(a)).toBeCloseTo(30 - 10);
+  });
+
+  it("shares a week's adds among the spots rather than giving each its own", () => {
+    // Two spots and two adds: still Tuesday's 6 and Thursday's 4, where two adds a spot would
+    // stream all four nights.
+    const valuation = valueLineup(team, UTIL, week, score, EVEN_NIGHTS, {
+      ...streaming,
+      streamers: new Set(['hughes', 'z']),
+      weeklyAdds: 2,
+    });
+
+    expect(valuation.total).toBeCloseTo(60 + 6 + 4);
+  });
+
+  it("holds an add's free agent for his club's later games in the week", () => {
+    // Boston plays Tuesday, Thursday and Saturday. One add on Tuesday brings the third best over
+    // those three nights, 5 a game, who plays all three: 15, where one night's add would be 8.
+    const bostonian = (playerId: string, perGame: number): Pickup =>
+      agent(playerId, 'BOS', 3 * perGame);
+    const pool = [
+      bostonian('b1', 10),
+      bostonian('b2', 8),
+      bostonian('b3', 5),
+      agent('t1', 'TOR', 9),
+      agent('t2', 'TOR', 8),
+      agent('t3', 'TOR', 6),
+    ];
+    const valuation = valueLineup(team, UTIL, week, score, EVEN_NIGHTS, {
+      streamers: new Set(['hughes']),
+      freeAgents: pool,
+      weeklyAdds: 1,
+    });
+
+    expect(valuation.total).toBeCloseTo(60 + 3 * 5);
+  });
+
+  it('keeps the free agent a spot holds into the next week, until its next add', () => {
+    // Florida plays Sunday the 1st and the Monday and Tuesday after, Nashville that Thursday,
+    // Saturday and Sunday, and the spot is the whole lineup. One add a week:
+    // - Sunday, a week of its own, adds Florida's third best, 5 a game.
+    // - He is still held as the next week starts, so his two games there come without an add,
+    //   and the week's add goes to Nashville's third best, 9 a game, from Thursday.
+    const clubs = schedule({
+      FLA: ['2026-11-01', '2026-11-02', '2026-11-03'],
+      NSH: ['2026-11-05', '2026-11-07', '2026-11-08'],
+    });
+    const pool = [
+      agent('f1', 'FLA', 30),
+      agent('f2', 'FLA', 24),
+      agent('f3', 'FLA', 15),
+      agent('n1', 'NSH', 36),
+      agent('n2', 'NSH', 33),
+      agent('n3', 'NSH', 27),
+    ];
+    const valuation = valueLineup(
+      [player('hughes', ['C'], 'EDM'), player('z', ['C'], 'XXX')],
+      UTIL,
+      clubs,
+      () => 50,
+      EVEN_NIGHTS,
+      { streamers: new Set(['hughes']), freeAgents: pool, weeklyAdds: 1 },
+    );
+
+    expect(valuation.total).toBeCloseTo(5 + 2 * 5 + 3 * 9);
+  });
+
   it('prices the two alike with no spot held: every open seat is worth nothing', () => {
     const core = [team[0], team[2]];
     const pricing = priceDrop(team[2], core, UTIL, week, score, EVEN_NIGHTS, {
@@ -482,6 +577,18 @@ describe('streaming spots', () => {
     expect(valuation.byPlayer.get('hughes')?.marginal).toBeCloseTo(6 * 5);
     expect(valuation.byPlayer.get('ir')?.starts).toBe(4);
     // Without him the spot would stream those four nights too: he is worth 10 less 5 on each.
+    expect(valuation.byPlayer.get('ir')?.marginal).toBeCloseTo(4 * (10 - 5));
+  });
+
+  it('gives a spot back from his first night back under a weekly add limit too', () => {
+    // One add holds Florida's third best from the first night on, till the spot is the
+    // defenceman's.
+    const valuation = valueLineup(injured, UTIL, tenNights, injuredScore, EVEN_NIGHTS, {
+      ...deep,
+      weeklyAdds: 1,
+    });
+
+    expect(valuation.byPlayer.get('hughes')?.marginal).toBeCloseTo(6 * 5);
     expect(valuation.byPlayer.get('ir')?.marginal).toBeCloseTo(4 * (10 - 5));
   });
 

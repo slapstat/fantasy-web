@@ -424,7 +424,10 @@ guard scripts in `.github/scripts/` (`check-build-placeholders.sh`, `check-deplo
   over the rest of the season** (`lineup-value.ts`: `valueLineup` seats the roster into the
   league's slots on every remaining night, best players first, so a player's *lineup cost* is
   what the team loses without him, which for a third centre behind two centre seats is nought
-  whatever he projects). **The drop is a page state, not a property of each row** (Alexander,
+  whatever he projects). A player the reader marks as a streamer is a streaming spot, not a seat,
+  filled from the free agents within the league's weekly add limit (`Streaming.weeklyAdds`, the
+  BFF's `maxWeeklyAdds`): an add holds its free agent until the spot's next add, and with no limit
+  known a spot takes a new one every night. **The drop is a page state, not a property of each row** (Alexander,
   2026-10-15, after an Impeccable critique found the old Swap column naming the same drop on
   nearly every row): with a full roster the room line offers the four cheapest holders of a
   roster spot as chips, the cheapest pressed (computed from the fetched roster, never assumed),

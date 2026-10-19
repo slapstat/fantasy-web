@@ -701,6 +701,54 @@ describe('PlayerScoutComponent', () => {
     expect(JSON.parse(localStorage.getItem(STREAMERS_KEY) ?? '{}')).toEqual({});
   });
 
+  it("streams the spots within the league's weekly add limit", async () => {
+    // The depth centres split between Seattle, on the odd nights, and Vancouver, on the even ones,
+    // so a spot streaming every night changes club every night, and one add a week cannot.
+    const answer = team();
+    myTeam.mockReturnValue(
+      of({
+        ...answer,
+        team: {
+          ...answer.team,
+          players: answer.team.players.map((player) =>
+            player.reserve ? { ...player, projection: skater(211, 0, 0, 0) } : player,
+          ),
+        },
+        schedule: new Map([
+          ['EDM', NIGHTS],
+          ['SEA', NIGHTS.filter((_, index) => index % 2 === 0)],
+          ['VAN', NIGHTS.filter((_, index) => index % 2 === 1)],
+        ]),
+      }),
+    );
+    const list = league();
+    players.mockReturnValue(
+      of({
+        ...list,
+        players: list.players.map((row) =>
+          row.owner === null &&
+          Number(row.freeAgent.playerId) > 10 &&
+          Number(row.freeAgent.playerId) <= 20
+            ? { ...row, freeAgent: { ...row.freeAgent, teamAbbrev: 'VAN' } }
+            : row,
+        ),
+      }),
+    );
+    localStorage.setItem(STREAMERS_KEY, JSON.stringify({ 'YAHOO:465.l.9': ['203'] }));
+
+    // No limit: Seattle's third best, 13.6 a game, on its five nights, Vancouver's, 11.6, on its.
+    expect(
+      (await render()).point.componentInstance.valuation()?.byPlayer.get('203')?.marginal,
+    ).toBeCloseTo(5 * 13.6 + 5 * 11.6);
+
+    // One add a week: Seattle's on the first Sunday, held through the next week until a
+    // Vancouver centre is added for its last night, and Seattle's again for the last two.
+    settings = { ...SETTINGS, maxWeeklyAdds: 1 };
+    expect(
+      (await render()).point.componentInstance.valuation()?.byPlayer.get('203')?.marginal,
+    ).toBeCloseTo(13.6 + (3 * 13.6 + 11.6) + 13.6);
+  });
+
   it('names the player whose going costs the lineup least, not the lowest scorer, and prices every pickup against him', async () => {
     // Two centre seats and one defence seat: the third centre starts nowhere, so he costs
     // nothing to drop, though he outscores the lone defenceman, who starts every night.
