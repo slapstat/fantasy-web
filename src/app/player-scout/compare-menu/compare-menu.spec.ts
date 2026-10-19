@@ -231,7 +231,7 @@ describe('CompareMenuComponent', () => {
     expect(sinceChange).not.toHaveBeenCalled();
   });
 
-  it('opens the platform picker from "Pick a day…" and changes nothing until a day is picked in it', () => {
+  it('opens the platform picker from "Pick a day" and changes nothing until a day is picked in it', () => {
     const { fixture, sinceChange, cleared } = render(false, null);
     const input = field(fixture).nativeElement as HTMLInputElement;
     const showPicker = vi.fn();

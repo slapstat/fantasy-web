@@ -1,5 +1,5 @@
 <!-- The button is the control: white in rest, navy with the day on it once a comparison is on.
-     The platform's date field hides under it, so the picker "Pick a day…" opens is anchored
+     The platform's date field hides under it, so the picker "Pick a day" opens is anchored
      here; the field is the picker's vehicle, not a stop of its own. -->
 <button
   #menu="appPopover"
@@ -49,7 +49,7 @@
     <div class="divider" role="presentation"></div>
     <button type="button" class="pick-day" [disabled]="noDayYet()" (click)="pickDay(menu)">
       <app-icon name="calendar-days" [size]="16" />
-      Pick a day…
+      Pick a day
     </button>
     <p class="menu-foot">{{ footer() }}</p>
   </div>

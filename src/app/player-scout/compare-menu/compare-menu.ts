@@ -251,7 +251,7 @@ export class CompareMenuComponent {
   }
 
   /**
-   * "Pick a day…": the menu closes and the platform's date picker opens on the button, where the
+   * "Pick a day": the menu closes and the platform's date picker opens on the button, where the
    * field hides. Nothing changes until a day is picked in it ({@link onDate}).
    */
   pickDay(menu: PopoverTriggerDirective): void {
