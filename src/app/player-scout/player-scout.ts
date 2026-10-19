@@ -56,7 +56,7 @@ import {
   ScoutSortKey,
   sortScout,
 } from './scout-ranking';
-import { ScoutTableComponent, ScoutView } from './scout-table/scout-table';
+import { ScoutTableComponent } from './scout-table/scout-table';
 import {
   formatDay,
   localToday,
@@ -75,10 +75,6 @@ export function surname(name: string): string {
   return name.trim().split(/\s+/).at(-1) ?? name;
 }
 
-/** The stretches of games the ice can be read over: a week, a fortnight, a month of hockey. */
-export const RECENT_GAME_OPTIONS = [3, 5, 10] as const;
-export const DEFAULT_RECENT_GAMES = 5;
-
 /**
  * Whose players the list shows, as Yahoo's player list offers it: by status, or one league team.
  * `team:<name>` is that team's roster.
@@ -87,9 +83,6 @@ export type ScoutPool = 'available' | 'fa' | 'waivers' | 'taken' | 'all' | `team
 
 /** Which way the model has moved on the players shown, once a comparison is on. */
 export type ScoutMovers = 'all' | 'risers' | 'fallers';
-
-/** The stretch the ice is read over: each club's last N games, or since the comparison's day. */
-export type IceWindow = 'last' | 'since';
 
 /** One of the user's own players as the roster fold-out lists him. */
 export interface RosterEntry {
@@ -119,18 +112,15 @@ export interface LeagueTeamOption {
 
 /**
  * Player Scout: every player in a league on the AI projection for the rest of the season, with,
- * on a switch, how the projection has moved since a chosen day, and, in a view of its own, what
- * the ice has shown lately. The FA scout's question (who is worth keeping) and Role Changes'
- * (whose job at his club just changed) on one list.
+ * on a switch, how the projection has moved since a chosen day: the FA scout's question (who is
+ * worth keeping). The ice itself, whose job at his club just changed, is Role Changes' page.
  *
  * <p>The list opens on the available players, best first on today's projection, and nothing
  * else: a reader who wants the top of the projection gets it with no figure wearing a change. A
  * comparison is one switch away: against the projection made before the season, or the one of
  * any day (the model is re-run nightly, so each day is a projection of its own), re-spread over
  * the games left so the two compare stat by stat; every figure then wears its change, the rank
- * its places gained. The ice view keeps the rank, the player and the score to sort by, and shows
- * the measured ice a game, power-play ice and share of the club's power play over each club's
- * last few games against his games before, with where the lineup page lists him.
+ * its places gained.
  *
  * <p>Whose players, as Yahoo's player list offers it: the available ones, free agents or waivers
  * alone, everyone taken, everyone, or one league team, an NHL club, and a tick to show the user's
@@ -197,29 +187,15 @@ export class PlayerScoutComponent {
     { equal: (a, b) => a?.platform === b?.platform && a?.leagueId === b?.leagueId },
   );
 
-  // --- The view, the comparison and the ice's window ------------------------------------------
+  // --- The comparison ---------------------------------------------------------------------------
 
-  readonly view = signal<ScoutView>('projection');
-
-  /** Whether the projection view compares with an earlier projection. Off: today's alone. */
+  /** Whether the list compares with an earlier projection. Off: today's alone. */
   readonly compare = signal(false);
 
   readonly today = localToday();
 
   /** The day compared with, as an ISO date, or null for the model's preseason projection. */
   readonly since = signal<string | null>(null);
-
-  /** The stretch the ice is read over, and how many games when it is each club's last few. */
-  readonly iceWindowPicked = signal<IceWindow>('last');
-  readonly recentGames = signal<number>(DEFAULT_RECENT_GAMES);
-  readonly recentGameOptions = RECENT_GAME_OPTIONS;
-
-  /** "Since the day" needs a day: without a comparison on a day, the ice is read over last games. */
-  readonly iceWindow = computed<IceWindow>(() =>
-    this.iceWindowPicked() === 'since' && this.compare() && this.since() !== null
-      ? 'since'
-      : 'last',
-  );
 
   toggleCompare(): void {
     this.compare.update((on) => !on);
@@ -236,13 +212,9 @@ export class PlayerScoutComponent {
     this.compare.set(false);
   }
 
-  onRecentGames(event: Event): void {
-    this.recentGames.set(Number((event.target as HTMLSelectElement).value));
-  }
-
   /**
    * What the league is asked for, equal by value: switching the comparison on against the
-   * preseason, or the view, changes nothing the BFF is asked, so the list is not read again.
+   * preseason changes nothing the BFF is asked, so the list is not read again.
    */
   private readonly query = computed(
     () => {
@@ -253,15 +225,13 @@ export class PlayerScoutComponent {
       return {
         league,
         since: this.compare() ? this.since() : null,
-        recentGames: this.iceWindow() === 'last' ? this.recentGames() : null,
       };
     },
     {
       equal: (a, b) =>
         a?.league.platform === b?.league.platform &&
         a?.league.leagueId === b?.league.leagueId &&
-        a?.since === b?.since &&
-        a?.recentGames === b?.recentGames,
+        a?.since === b?.since,
     },
   );
 
@@ -270,7 +240,6 @@ export class PlayerScoutComponent {
     stream: ({ params }) =>
       this.scoutService.players(params.league.platform, params.league.leagueId, {
         since: params.since,
-        recentGames: params.recentGames,
       }),
   });
 
@@ -339,15 +308,6 @@ export class PlayerScoutComponent {
       return 'no earlier projection';
     }
     return answer.kind === 'SNAPSHOT' ? `vs ${formatDay(answer.resolved)}` : 'vs preseason';
-  });
-
-  /** What the ice is measured over, for the table's heading: "last 5 games", "since 7 Oct". */
-  readonly iceLabel = computed(() => {
-    if (this.iceWindow() === 'since') {
-      return `since ${formatDay(this.since())}`;
-    }
-    const games = this.list()?.recentGames ?? this.recentGames();
-    return `each club's last ${games} games`;
   });
 
   /** The league's own scoring, or the app's defaults until its settings land. */
@@ -926,31 +886,24 @@ export class PlayerScoutComponent {
 
   /**
    * The order on screen: the one picked, while its column is still in the table. A category the
-   * league does not score, a change with no comparison on, or ice with no skater listed, falls
+   * league does not score, a change with no comparison on, or a gain with no gain column, falls
    * back to the ranked order rather than sorting by blanks.
    */
   readonly sort = computed<ScoutSort>(() => {
     const sort = this.sortPicked();
-    const about: ScoutSortKey[] = ['name', 'score'];
-    if (this.view() === 'projection') {
-      about.push('games');
-      if (this.shown() !== 'goalies') {
-        about.push('toi');
-      }
-      if (this.compare()) {
-        about.push('delta', 'rise');
-      }
-      if (this.gains() !== null) {
-        about.push('gain');
-      }
-      return about.includes(sort.key) || this.categories().includes(sort.key as ScoringStatKey)
-        ? sort
-        : SCOUT_RANKED_ORDER;
-    }
+    const about: ScoutSortKey[] = ['name', 'score', 'games'];
     if (this.shown() !== 'goalies') {
-      about.push('ice', 'powerPlay');
+      about.push('toi');
     }
-    return about.includes(sort.key) ? sort : SCOUT_RANKED_ORDER;
+    if (this.compare()) {
+      about.push('delta', 'rise');
+    }
+    if (this.gains() !== null) {
+      about.push('gain');
+    }
+    return about.includes(sort.key) || this.categories().includes(sort.key as ScoringStatKey)
+      ? sort
+      : SCOUT_RANKED_ORDER;
   });
 
   /** Sorts the whole list by a column, best first; the same column again turns it round. */
@@ -1010,7 +963,6 @@ export class PlayerScoutComponent {
       this.league(),
       this.since(),
       this.compare(),
-      this.view(),
       this.sort(),
     ],
     computation: () => 0,
@@ -1043,25 +995,18 @@ export class PlayerScoutComponent {
   // --- The gains ---------------------------------------------------------------------------------
 
   /**
-   * What the lineup gains by each available player in the list against the chosen drop, in the
-   * projection view of a full roster: the one drop is priced once and every pickup against him,
+   * What the lineup gains by each available player in the list against the chosen drop, for a
+   * full roster: the one drop is priced once and every pickup against him,
    * over the whole list rather than the page, so the column sorts. Null where there is no column:
    * an open spot or an injured player to move costs nobody, so the room line is the whole answer;
-   * no team of the user's, no drop that can be weighed, or the ice view.
+   * no team of the user's, or no drop that can be weighed.
    */
   readonly gains = computed<ReadonlyMap<string, number | null> | null>(() => {
     const team = this.team();
     const slots = this.slots();
     const schedule = this.schedule();
     const drop = this.drop();
-    if (
-      this.view() !== 'projection' ||
-      !this.fullRoster() ||
-      !team ||
-      !slots ||
-      schedule.size === 0 ||
-      !drop
-    ) {
+    if (!this.fullRoster() || !team || !slots || schedule.size === 0 || !drop) {
       return null;
     }
     const pickups = this.filtered().filter((row) => row.scout.owner === null);

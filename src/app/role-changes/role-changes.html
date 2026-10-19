@@ -1,0 +1,213 @@
+<div class="role-changes">
+  <div class="page-header">
+    <h1>Role Changes</h1>
+    <app-help-tip
+      label="What this page shows"
+      text="Skaters whose ice time or power-play role changed over their team's last few games, compared with their earlier games this season (or last season, until a player has five games this season). The lineup column shows where the lineup page listed him before and now."
+    />
+  </div>
+
+  <div class="role-card">
+    <div class="controls">
+      <div class="segmented" role="group" aria-label="Direction">
+        <button
+          type="button"
+          [class.active]="direction() === 'rising'"
+          [attr.aria-pressed]="direction() === 'rising'"
+          (click)="direction.set('rising')"
+        >
+          Rising
+        </button>
+        <button
+          type="button"
+          [class.active]="direction() === 'falling'"
+          [attr.aria-pressed]="direction() === 'falling'"
+          (click)="direction.set('falling')"
+        >
+          Falling
+        </button>
+      </div>
+
+      <div class="segmented" role="group" aria-label="Measure">
+        <button
+          type="button"
+          [class.active]="measure() === 'ice'"
+          [attr.aria-pressed]="measure() === 'ice'"
+          (click)="measure.set('ice')"
+        >
+          Ice time
+        </button>
+        <button
+          type="button"
+          [class.active]="measure() === 'powerPlay'"
+          [attr.aria-pressed]="measure() === 'powerPlay'"
+          (click)="measure.set('powerPlay')"
+        >
+          Power play
+        </button>
+      </div>
+
+      <div class="segmented" role="group" aria-label="Position">
+        @for (option of ['all', 'F', 'D']; track option) {
+          <button
+            type="button"
+            [class.active]="position() === option"
+            [attr.aria-pressed]="position() === option"
+            (click)="position.set($any(option))"
+          >
+            {{ option === 'all' ? 'All' : option }}
+          </button>
+        }
+      </div>
+
+      <label class="field">
+        <span>Last</span>
+        <select (change)="onRecentGames($event)" aria-label="Recent games">
+          @for (option of recentGameOptions; track option) {
+            <option [value]="option" [selected]="option === recentGames()">
+              {{ option }} games
+            </option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Min GP</span>
+        <select (change)="onMinGames($event)" aria-label="Minimum games">
+          @for (option of minGameOptions; track option) {
+            <option [value]="option" [selected]="option === minGames()">{{ option }}</option>
+          }
+        </select>
+      </label>
+
+      <input
+        class="search"
+        type="search"
+        placeholder="Search players"
+        aria-label="Search players"
+        [value]="search()"
+        (input)="onSearch($event)"
+      />
+    </div>
+
+    @if (measured.isLoading()) {
+      <app-loading-indicator />
+    } @else if (measured.error()) {
+      <app-error-state
+        title="Role changes did not load"
+        [error]="measured.error()"
+        (retry)="reload()"
+      />
+    } @else if (rows().length === 0) {
+      <p class="empty">
+        No skater's {{ measure() === 'ice' ? 'ice time' : 'power-play share' }}
+        {{ direction() === 'rising' ? 'rose' : 'fell' }} enough over the last
+        {{ recentGames() }} games to show here.
+      </p>
+    } @else {
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th class="player-col">Player</th>
+              <th class="num">GP</th>
+              <th class="num" [class.sorted]="measure() === 'ice'">Ice / game</th>
+              <th class="num" [class.sorted]="measure() === 'ice'">Change</th>
+              <th class="num">PP / game</th>
+              <th class="num" [class.sorted]="measure() === 'powerPlay'">PP share</th>
+              <th class="num" [class.sorted]="measure() === 'powerPlay'">Change</th>
+              <th>Lineup</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.player.playerId) {
+              <tr>
+                <td class="player-col">
+                  <div class="player">
+                    <app-team-logo [team]="row.player.teamAbbrev" />
+                    <div>
+                      <div class="name">{{ row.player.name }}</div>
+                      <div class="meta">
+                        {{ row.player.teamAbbrev }} · {{ row.player.defence ? 'D' : 'F' }} · vs
+                        {{ row.player.baselineSource === 'LAST_SEASON' ? 'last season' : 'season' }}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td class="num">{{ row.player.recent.games }}</td>
+                <td class="num">
+                  @if (row.player.baseline?.toiPerGame != null) {
+                    <span class="before"
+                      >{{ formatIce(row.player.baseline.toiPerGame) }}
+                      <app-icon name="arrow-right" [size]="14"
+                    /></span>
+                  }
+                  {{ formatIce(row.player.recent.toiPerGame) }}
+                </td>
+                <td
+                  class="num change"
+                  [class.up]="(row.iceChange ?? 0) > 0"
+                  [class.down]="(row.iceChange ?? 0) < 0"
+                >
+                  {{ formatIceChange(row.iceChange) }}
+                </td>
+                <td class="num">
+                  @if (row.player.baseline?.ppToiPerGame != null) {
+                    <span class="before"
+                      >{{ formatIce(row.player.baseline.ppToiPerGame) }}
+                      <app-icon name="arrow-right" [size]="14"
+                    /></span>
+                  }
+                  {{ formatIce(row.player.recent.ppToiPerGame) }}
+                </td>
+                <td class="num">
+                  @if (row.player.baseline?.ppShare != null) {
+                    <span class="before"
+                      >{{ formatShare(row.player.baseline.ppShare) }}
+                      <app-icon name="arrow-right" [size]="14"
+                    /></span>
+                  }
+                  {{ formatShare(row.player.recent.ppShare) }}
+                </td>
+                <td
+                  class="num change"
+                  [class.up]="(row.powerPlayShareChange ?? 0) > 0"
+                  [class.down]="(row.powerPlayShareChange ?? 0) < 0"
+                >
+                  {{ formatShareChange(row.powerPlayShareChange) }}
+                </td>
+                <td class="lineup">
+                  @if (row.lineMove || row.powerPlayMove) {
+                    @if (row.lineMove) {
+                      <span
+                        class="badge"
+                        [class.up]="row.listedHigher === true"
+                        [class.down]="row.listedHigher === false"
+                        >{{ row.lineMove.from }} <app-icon name="arrow-right" [size]="14" />
+                        {{ row.lineMove.to }}</span
+                      >
+                    }
+                    @if (row.powerPlayMove) {
+                      <span
+                        class="badge"
+                        [class.up]="row.listedHigher === true"
+                        [class.down]="row.listedHigher === false"
+                        >{{ row.powerPlayMove.from }} <app-icon name="arrow-right" [size]="14" />
+                        {{ row.powerPlayMove.to }}</span
+                      >
+                    }
+                  } @else if (row.player.listedNow; as now) {
+                    <span class="listed">
+                      {{ lineLabel(now) ?? (now.outOfLineup ? 'Out' : '') }}
+                      {{ now.powerPlayUnit ? 'PP' + now.powerPlayUnit : '' }}
+                    </span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>

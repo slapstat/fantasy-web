@@ -167,40 +167,12 @@
 .player-row--held .player-name,
 .player-row--held .score,
 .player-row--held .figure-now,
-.player-row--held td.ice-col .figure-now,
 .player-row--held td.num {
   color: var(--color-text-subtle);
 }
 
 .player-row--held .player-logo {
   opacity: 0.55;
-}
-
-/* The measured ice is what the score is explained by, so it keeps the figure's weight. */
-.scout-table td.ice-col .figure-now {
-  color: var(--color-text);
-}
-
-/* Where the lineup page lists him: the listing with an arrow for the way it moved, and where
-   it listed him before beneath. */
-.scout-table .lineup-col {
-  text-align: left;
-  white-space: nowrap;
-}
-
-.listed {
-  align-items: center;
-  display: inline-flex;
-  font-weight: var(--weight-semibold);
-  gap: 2px;
-}
-
-.listed--up {
-  color: var(--color-success);
-}
-
-.listed--down {
-  color: var(--color-danger);
 }
 
 /* The gain: what the lineup gains over the rest of the season by the pickup against the drop the

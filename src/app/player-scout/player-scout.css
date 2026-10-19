@@ -55,49 +55,6 @@
   color: var(--color-primary);
 }
 
-/* The two things the table can show, switched as the planner switches its views. */
-.views {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  display: inline-flex;
-  gap: var(--space-1);
-  padding: 3px;
-}
-
-.view {
-  align-items: center;
-  background: none;
-  border: none;
-  border-radius: var(--radius-pill);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  gap: var(--space-2);
-  min-height: 2.25rem;
-  padding: 0 var(--space-4);
-  transition:
-    background var(--transition-fast),
-    color var(--transition-fast);
-}
-
-.view:hover:not(.view--active) {
-  color: var(--color-primary);
-}
-
-.view:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
-}
-
-.view--active {
-  background: var(--color-primary);
-  color: var(--color-primary-contrast);
-}
-
 /* The league on the title line, inline (label, tabs, league), with the ESPN card under it. */
 .league {
   display: block;
@@ -310,11 +267,7 @@ select:focus-visible,
   padding: var(--space-2) var(--space-3);
 }
 
-.viewbar .views {
-  flex: none;
-}
-
-/* A label and its control: the comparison, which way the movers went, the ice's window. */
+/* A label and its control: the comparison, and which way the movers went. */
 .setting {
   align-items: center;
   display: inline-flex;
@@ -322,7 +275,7 @@ select:focus-visible,
   gap: var(--space-2);
 }
 
-/* Which day actually answered, or what the ice is read over: a line of its own under the band's
+/* Which day actually answered: a line of its own under the band's
    controls, since it is the band's footnote. */
 .caption {
   color: var(--color-text-muted);
@@ -820,15 +773,5 @@ select:focus-visible,
 
   .viewbar {
     gap: var(--space-2) var(--space-3);
-  }
-
-  .viewbar .views {
-    display: flex;
-    width: 100%;
-  }
-
-  .viewbar .view {
-    flex: 1;
-    justify-content: center;
   }
 }

@@ -1,10 +1,10 @@
 <div class="table-scroll">
-  <table class="free-agents-table scout-table" [class.scout-table--compare]="comparing()">
+  <table class="free-agents-table scout-table" [class.scout-table--compare]="compare()">
     <thead>
       <!-- With a comparison on, the projection columns are named once above them, with what
-           they are compared against; the ice view names its window the same way. The two gain
+           they are compared against. The two gain
            columns are named by the drop they are set against. -->
-      @if (comparing()) {
+      @if (compare()) {
         <tr class="group-row">
           <th scope="colgroup" colspan="2" class="group-col group-col--blank"></th>
           <th scope="colgroup" [attr.colspan]="projectionSpan()" class="group-col group-col--start">
@@ -28,14 +28,6 @@
             <span class="group-name">vs {{ dropName() }}</span>
           </th>
         </tr>
-      } @else if (view() === 'ice') {
-        <tr class="group-row">
-          <th scope="colgroup" colspan="3" class="group-col group-col--blank"></th>
-          <th scope="colgroup" colspan="5" class="group-col group-col--start">
-            <span class="group-name">On the ice</span>
-            <span class="group-since">{{ iceLabel() }}, against his games before</span>
-          </th>
-        </tr>
       }
       <tr>
         <th scope="col" class="num rank-col" [appTooltip]="rankTip()">#</th>
@@ -50,7 +42,7 @@
         <th
           scope="col"
           class="num score-col"
-          [class.stat-col--start]="comparing()"
+          [class.stat-col--start]="compare()"
           [attr.aria-sort]="ariaSort('score')"
         >
           <button
@@ -64,7 +56,7 @@
             }
             {{ scoreHeading() }}
           </button>
-          @if (comparing()) {
+          @if (compare()) {
             <button
               type="button"
               class="sort sort--delta"
@@ -78,106 +70,67 @@
             </button>
           }
         </th>
-        @if (view() === 'projection') {
-          <th scope="col" class="num" [attr.aria-sort]="ariaSort('games')">
-            <button
-              type="button"
-              class="sort"
-              appTooltip="Projected games left"
-              (click)="sortBy.emit('games')"
-            >
-              @if (sort().key === 'games') {
-                <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
-              }
-              GP
-            </button>
-          </th>
-          @if (anySkater()) {
-            <th scope="col" class="num toi-col" [attr.aria-sort]="ariaSort('toi')">
-              <button
-                type="button"
-                class="sort"
-                appTooltip="Projected ice time per game"
-                (click)="sortBy.emit('toi')"
-              >
-                @if (sort().key === 'toi') {
-                  <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
-                }
-                TOI
-              </button>
-            </th>
-          }
-          @for (column of columns(); track column.key) {
-            <th scope="col" class="num stat-col" [attr.aria-sort]="ariaSort(column.key)">
-              <button
-                type="button"
-                class="sort"
-                [appTooltip]="column.name"
-                (click)="sortBy.emit(column.key)"
-              >
-                @if (sort().key === column.key) {
-                  <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
-                }
-                {{ column.label }}
-              </button>
-            </th>
-          }
-          @if (gaining()) {
-            <!-- His projection less the drop's orders the list as his projection does, so the
-                 column has no sort of its own: the Points heading already sorts by it. -->
-            <th
-              scope="col"
-              class="num score-gain-col stat-col--start"
-              [appTooltip]="scoreGainTip()"
-            >
-              {{ scoreHeading() }}
-            </th>
-            <th scope="col" class="num gain-col" [attr.aria-sort]="ariaSort('gain')">
-              <button
-                type="button"
-                class="sort"
-                [appTooltip]="gainTip()"
-                (click)="sortBy.emit('gain')"
-              >
-                @if (sort().key === 'gain') {
-                  <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
-                }
-                Lineup
-              </button>
-            </th>
-          }
-        } @else {
-          <th
-            scope="col"
-            class="num stat-col--start"
-            appTooltip="Games he played in the recent stretch"
+        <th scope="col" class="num" [attr.aria-sort]="ariaSort('games')">
+          <button
+            type="button"
+            class="sort"
+            appTooltip="Projected games left"
+            (click)="sortBy.emit('games')"
           >
-            Games
-          </th>
-          <th scope="col" class="num ice-col" [attr.aria-sort]="ariaSort('ice')">
-            <button type="button" class="sort" (click)="sortBy.emit('ice')">
-              @if (sort().key === 'ice') {
-                <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
-              }
-              Ice / game
-            </button>
-          </th>
-          <th scope="col" class="num">PP / game</th>
-          <th scope="col" class="num" [attr.aria-sort]="ariaSort('powerPlay')">
+            @if (sort().key === 'games') {
+              <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
+            }
+            GP
+          </button>
+        </th>
+        @if (anySkater()) {
+          <th scope="col" class="num toi-col" [attr.aria-sort]="ariaSort('toi')">
             <button
               type="button"
               class="sort"
-              appTooltip="His share of his club's power-play time"
-              (click)="sortBy.emit('powerPlay')"
+              appTooltip="Projected ice time per game"
+              (click)="sortBy.emit('toi')"
             >
-              @if (sort().key === 'powerPlay') {
+              @if (sort().key === 'toi') {
                 <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
               }
-              PP share
+              TOI
             </button>
           </th>
-          <th scope="col" class="lineup-col" appTooltip="His Daily Faceoff line, now and before">
-            Lineup
+        }
+        @for (column of columns(); track column.key) {
+          <th scope="col" class="num stat-col" [attr.aria-sort]="ariaSort(column.key)">
+            <button
+              type="button"
+              class="sort"
+              [appTooltip]="column.name"
+              (click)="sortBy.emit(column.key)"
+            >
+              @if (sort().key === column.key) {
+                <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
+              }
+              {{ column.label }}
+            </button>
+          </th>
+        }
+        @if (gaining()) {
+          <!-- His projection less the drop's orders the list as his projection does, so the
+                 column has no sort of its own: the Points heading already sorts by it. -->
+          <th scope="col" class="num score-gain-col stat-col--start" [appTooltip]="scoreGainTip()">
+            {{ scoreHeading() }}
+          </th>
+          <th scope="col" class="num gain-col" [attr.aria-sort]="ariaSort('gain')">
+            <button
+              type="button"
+              class="sort"
+              [appTooltip]="gainTip()"
+              (click)="sortBy.emit('gain')"
+            >
+              @if (sort().key === 'gain') {
+                <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
+              }
+              Lineup
+            </button>
           </th>
         }
       </tr>
@@ -233,9 +186,9 @@
                       ownerTag(entry.row)
                     }}</span>
                   }
-                  @if (comparing() && entry.row.rising) {
+                  @if (compare() && entry.row.rising) {
                     <span class="scout-tag scout-tag--rising">Rising</span>
-                  } @else if (comparing() && entry.row.then === null) {
+                  } @else if (compare() && entry.row.then === null) {
                     <span class="scout-tag" appTooltip="No projection on the chosen day">New</span>
                   }
                 </span>
@@ -264,87 +217,48 @@
               </span>
             </span>
           </th>
-          <td class="num score-col" [class.stat-col--start]="comparing()">
+          <td class="num score-col" [class.stat-col--start]="compare()">
             <span class="score">{{ score(entry.row) }}</span>
             @if (deltaScore(entry.row); as delta) {
               <span class="delta" [class]="'delta delta--' + delta.dir">{{ delta.text }}</span>
             }
           </td>
-          @if (view() === 'projection') {
-            <td class="num">
-              <span class="figure-now">{{ games(entry.row) }}</span>
-              @if (deltaGames(entry.row); as delta) {
-                <span class="delta" [class]="'delta delta--' + delta.dir">{{ delta.text }}</span>
-              }
-            </td>
-            @if (anySkater()) {
-              <td class="num toi-col">
-                <span class="figure-now">{{ toiNow(entry.row) }}</span>
-                @if (deltaToi(entry.row); as delta) {
-                  <span class="delta" [class]="'delta delta--' + delta.dir">{{ delta.text }}</span>
-                }
-              </td>
+          <td class="num">
+            <span class="figure-now">{{ games(entry.row) }}</span>
+            @if (deltaGames(entry.row); as delta) {
+              <span class="delta" [class]="'delta delta--' + delta.dir">{{ delta.text }}</span>
             }
-            @for (cell of entry.cells; track $index) {
-              <td class="num stat-col" [class.nil]="cell.stat && isNil(cell.stat)">
-                <span class="figure-now">{{ cell.stat?.value }}</span>
-                @if (cell.delta; as delta) {
-                  <span class="delta" [class]="'delta delta--' + delta.dir">{{ delta.text }}</span>
-                }
-              </td>
-            }
-            @if (gaining()) {
-              <td class="num score-gain-col stat-col--start">
-                @if (pickable(entry.row)) {
-                  @if (scoreGain(entry.row); as more) {
-                    <span class="gain gain--score gain--{{ more.dir }}">{{ more.text }}</span>
-                  }
-                }
-              </td>
-              <td class="num gain-col" [class.gain-col--top]="isTopGain(entry.row)">
-                @if (pickable(entry.row)) {
-                  @if (gain(entry.row); as gain) {
-                    <span class="gain gain--{{ gain.dir }}">{{ gain.text }}</span>
-                  } @else {
-                    <span class="gain-unknown">?</span>
-                  }
-                }
-              </td>
-            }
-          } @else {
-            <td class="num stat-col--start" [appTooltip]="iceTip(entry.row)">
-              {{ iceGames(entry.row) }}
-            </td>
-            <td class="num ice-col" [appTooltip]="iceTip(entry.row)">
-              <span class="figure-now">{{ iceNow(entry.row) }}</span>
-              @if (deltaIce(entry.row); as delta) {
+          </td>
+          @if (anySkater()) {
+            <td class="num toi-col">
+              <span class="figure-now">{{ toiNow(entry.row) }}</span>
+              @if (deltaToi(entry.row); as delta) {
                 <span class="delta" [class]="'delta delta--' + delta.dir">{{ delta.text }}</span>
               }
             </td>
-            <td class="num" [appTooltip]="iceTip(entry.row)">
-              <span class="figure-now">{{ ppIceNow(entry.row) }}</span>
-              @if (deltaPpIce(entry.row); as delta) {
+          }
+          @for (cell of entry.cells; track $index) {
+            <td class="num stat-col" [class.nil]="cell.stat && isNil(cell.stat)">
+              <span class="figure-now">{{ cell.stat?.value }}</span>
+              @if (cell.delta; as delta) {
                 <span class="delta" [class]="'delta delta--' + delta.dir">{{ delta.text }}</span>
               }
             </td>
-            <td class="num" [appTooltip]="iceTip(entry.row)">
-              <span class="figure-now">{{ shareNow(entry.row) }}</span>
-              @if (deltaShare(entry.row); as delta) {
-                <span class="delta" [class]="'delta delta--' + delta.dir">{{ delta.text }}</span>
+          }
+          @if (gaining()) {
+            <td class="num score-gain-col stat-col--start">
+              @if (pickable(entry.row)) {
+                @if (scoreGain(entry.row); as more) {
+                  <span class="gain gain--score gain--{{ more.dir }}">{{ more.text }}</span>
+                }
               }
             </td>
-            <td class="lineup-col" [appTooltip]="listedTip(entry.row)">
-              @if (listedNow(entry.row); as now) {
-                <span class="listed" [class]="'listed listed--' + listedDir(entry.row)">
-                  @if (listedDir(entry.row) === 'up') {
-                    <app-icon name="arrow-up" [size]="14" />
-                  } @else if (listedDir(entry.row) === 'down') {
-                    <app-icon name="arrow-down" [size]="14" />
-                  }
-                  {{ now }}
-                </span>
-                @if (listedThen(entry.row); as then) {
-                  <span class="delta delta--note">{{ then }}</span>
+            <td class="num gain-col" [class.gain-col--top]="isTopGain(entry.row)">
+              @if (pickable(entry.row)) {
+                @if (gain(entry.row); as gain) {
+                  <span class="gain gain--{{ gain.dir }}">{{ gain.text }}</span>
+                } @else {
+                  <span class="gain-unknown">?</span>
                 }
               }
             </td>
