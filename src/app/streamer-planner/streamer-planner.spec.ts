@@ -574,6 +574,29 @@ describe('StreamerPlannerComponent', () => {
       ]);
     });
 
+    it('searches the list by name, each player keeping his place among everyone', async () => {
+      const fixture = await render();
+      const planner = fixture.point.componentInstance;
+      const input = () => ngMocks.find(fixture, 'input.search-input');
+
+      input().nativeElement.value = 'goalie';
+      input().nativeElement.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      expect(planner.visible().map((row) => [row.player.name, row.rank])).toEqual([
+        ['Waiver Goalie', 3],
+      ]);
+
+      planner.togglePosition('LW');
+      fixture.detectChanges();
+      expect(ngMocks.formatText(fixture)).toContain(
+        'No available player at these positions matches "goalie".',
+      );
+      planner.clearPositions();
+      input().nativeElement.value = '';
+      input().nativeElement.dispatchEvent(new Event('input'));
+      expect(planner.visible()).toHaveLength(3);
+    });
+
     function longList(length: number): FreeAgentWeek {
       return {
         creases: [],

@@ -99,6 +99,26 @@ export function filterByPositions(
   );
 }
 
+/** A name or a search as it is compared: lower case, without its accents, so "slafkovsky" finds Slafkovský. */
+function foldName(text: string): string {
+  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+/**
+ * The ranked players whose name holds the text searched for, in the order they were ranked. No
+ * text is every player; each keeps his rank, so a player searched for still says where he stands.
+ */
+export function filterByName(
+  ranked: readonly RankedFreeAgent[],
+  search: string,
+): readonly RankedFreeAgent[] {
+  const term = foldName(search.trim());
+  if (!term) {
+    return ranked;
+  }
+  return ranked.filter((row) => foldName(row.player.name).includes(term));
+}
+
 /** The teams the server rated, findable by a club abbreviation in any platform's spelling. */
 export function teamsByKey(teams: readonly TeamSchedule[]): Map<string, TeamSchedule> {
   return new Map(teams.map((team) => [nhlTeamKey(team.team) ?? team.team, team]));
