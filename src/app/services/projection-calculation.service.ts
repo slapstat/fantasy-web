@@ -257,8 +257,15 @@ export class ProjectionCalculationService {
       totalsByIndex,
       contributionsByIndex,
       scales?.skater ?? null,
-      null,
+      0,
     );
+    // A goalie's GAA, save and win percentage are measured against the wire, the half
+    // a pool's worth of goalies ranked straight after it: the minutes he plays are minutes his team
+    // would otherwise fill from there, so a goalie better than the wire is worth more the more he
+    // plays. Measured against the pool's own rate, a goalie who never played scored exactly
+    // average on both ratios, outscored every busy starter under that average, and a
+    // rest-of-season board's pool filled up with goalies who do not play. A week (`'empty'`) is
+    // measured against the same wire, so its order stays the season's, one constant apart.
     this.applyPoolZScores(
       goalies,
       GOALIE_SCORING_STAT_KEYS,
@@ -269,15 +276,16 @@ export class ProjectionCalculationService {
       totalsByIndex,
       contributionsByIndex,
       scales?.goalie ?? null,
-      (projection) => projection.stats.utility.gp,
+      Math.ceil(goaliePoolSize / 2),
     );
   }
 
   /**
-   * One kind of player's z-scores. The pool is the best `poolSize` of the candidates, which cannot
-   * be known before they are scored, so it is guessed as all of them and re-derived from the
-   * scores until it stops moving. `gamesOf`, where given, narrows the candidates to the ones who
-   * play the most (see {@link mostPlayed}).
+   * One kind of player's z-scores. The pool is the best `poolSize` of them, which cannot be known
+   * before they are scored, so it is guessed as all of them and re-derived from the scores until it
+   * stops moving. The `wireSize` players ranked straight after the pool are the wire; where there
+   * is one, a ratio is measured against its rate rather than the pool's (see {@link ratioValues}),
+   * and it is re-derived alongside the pool.
    */
   private applyPoolZScores<P extends Projection, K extends ScoringStatKey>(
     entries: PoolEntry<P>[],
@@ -289,7 +297,7 @@ export class ProjectionCalculationService {
     totalsByIndex: number[],
     contributionsByIndex: Record<string, number>[] | null,
     scales: Record<string, number> | null,
-    gamesOf: ((projection: P) => number) | null,
+    wireSize: number,
   ): void {
     if (entries.length === 0) {
       return;
@@ -312,22 +320,38 @@ export class ProjectionCalculationService {
       return { values, volumes, direction };
     });
 
-    const candidates = gamesOf
-      ? this.mostPlayed(entries, poolSize, gamesOf)
-      : entries.map((_entry, position) => position);
-    let poolPositions = candidates;
-    let zScores = this.zScoresForPool(categories, poolPositions, entries.length, origin);
+    let poolPositions = entries.map((_entry, position) => position);
+    let wirePositions: number[] = [];
+    let zScores = this.zScoresForPool(
+      categories,
+      poolPositions,
+      wirePositions,
+      entries.length,
+      origin,
+    );
 
     for (let iteration = 0; iteration < MAX_POOL_ITERATIONS; iteration++) {
       const { totals } = zScores;
-      const nextPositions = [...candidates]
-        .sort((first, second) => totals[second] - totals[first])
-        .slice(0, poolSize);
-      if (this.samePositions(nextPositions, poolPositions)) {
+      const ranked = entries
+        .map((_entry, position) => position)
+        .sort((first, second) => totals[second] - totals[first]);
+      const nextPositions = ranked.slice(0, poolSize);
+      const nextWire = ranked.slice(poolSize, poolSize + wireSize);
+      if (
+        this.samePositions(nextPositions, poolPositions) &&
+        this.samePositions(nextWire, wirePositions)
+      ) {
         break;
       }
       poolPositions = nextPositions;
-      zScores = this.zScoresForPool(categories, poolPositions, entries.length, origin);
+      wirePositions = nextWire;
+      zScores = this.zScoresForPool(
+        categories,
+        poolPositions,
+        wirePositions,
+        entries.length,
+        origin,
+      );
     }
     if (origin === 'replacement') {
       this.shiftToReplacement(zScores, poolSize);
@@ -360,42 +384,13 @@ export class ProjectionCalculationService {
   }
 
   /**
-   * The goalies a league would roster are the ones who play, so only they may make up the pool:
-   * every goalie with at least as many games as the `poolSize`-th most-played. The pool cannot be
-   * picked by value alone, because a goalie who never plays scores exactly the pool's average on
-   * GAA and save percentage. In a league scoring wins, GAA and save percentage he then outscores
-   * every busy starter with ratios under the pool's, takes that starter's seat, and drags the
-   * pool's wins down and its spread in until the next starter falls out too. A rest-of-season
-   * board, a third of its goalies out or in the minors, ran that way into a pool of goalies with
-   * no games and z-scores of minus thirty. A tie at the edge, or a board whose goalies all carry
-   * the same games, is still settled by value.
-   */
-  private mostPlayed<P extends Projection>(
-    entries: PoolEntry<P>[],
-    poolSize: number,
-    gamesOf: (projection: P) => number,
-  ): number[] {
-    const positions = entries.map((_entry, position) => position);
-    if (poolSize <= 0) {
-      return [];
-    }
-    if (entries.length <= poolSize) {
-      return positions;
-    }
-    const games = entries.map((entry) => gamesOf(entry.projection));
-    const edge = [...games].sort((first, second) => second - first)[poolSize - 1];
-    return positions.filter((position) => games[position] >= edge);
-  }
-
-  /**
    * Moves nought from the pool's average to the replacement player, the `poolSize`-th best (the
    * last a league of that size would roster), category by category, so the breakdown still sums
    * to the total. The spread is measured from the mean, but half the pool sits under it, and a
    * rostered player reading as less than nothing says his team would be better off without him.
-   * One constant per pool, so no order and no difference moves.
-   *
-   * He is read off the totals rather than the pool, because the goalies' pool is chosen by games
-   * and its worst member can be a busy starter well below the last goalie anyone would roster.
+   * One constant per pool, so no order and no difference moves. He is read off the totals rather
+   * than the pool, so a pool that has not settled by the last pass still puts nought at the
+   * `poolSize`-th best.
    */
   private shiftToReplacement(zScores: PoolZScores, poolSize: number): void {
     const { totals, byCategory } = zScores;
@@ -428,6 +423,7 @@ export class ProjectionCalculationService {
   private zScoresForPool(
     categories: CategoryValues[],
     poolPositions: number[],
+    wirePositions: number[],
     size: number,
     origin: ZScoreOrigin,
   ): PoolZScores {
@@ -441,7 +437,7 @@ export class ProjectionCalculationService {
     categories.forEach((category, index) => {
       // A ratio's contribution already carries its direction: goals prevented are good.
       const values = category.volumes
-        ? this.ratioValues(category, poolPositions, size)
+        ? this.ratioValues(category, poolPositions, wirePositions, size)
         : category.values;
       if (!values) {
         return;
@@ -479,19 +475,22 @@ export class ProjectionCalculationService {
   }
 
   /**
-   * A ratio's value for every entry: `(rate − pool rate) × volume`, turned round where lower is
-   * better, so GAA becomes goals prevented and save percentage saves above average. The pool rate is
-   * the pool's own, volume-weighted — its summed goals against over its summed hours, not the mean
-   * of its GAAs — and moves with the pool from one iteration to the next.
+   * A ratio's value for every entry: `(rate − reference rate) × volume`, turned round where lower
+   * is better, so GAA becomes goals prevented and save percentage saves above the reference. The
+   * reference is the wire's rate where there is a wire with volume, so the minutes of a goalie
+   * better than what a team could pick up count for him, and the pool's own rate otherwise. Either
+   * is volume-weighted — summed goals against over summed hours, not the mean of the GAAs — and
+   * moves with the pool and the wire from one iteration to the next.
    *
    * A line with a rate but nothing to derive a volume from (see `ratioVolume`) is weighed at the
    * pool's average volume, which ranks it on its bare rate, as every line was ranked before; a line
-   * with neither has nothing to add to a team's ratio and scores exactly average. `null` when the
-   * pool has no spread in the rate, or no volume at all.
+   * with neither has nothing to add to a team's ratio and scores exactly the reference. `null` when
+   * the pool has no spread in the rate, or no volume at all.
    */
   private ratioValues(
     category: CategoryValues,
     poolPositions: number[],
+    wirePositions: number[],
     size: number,
   ): Float64Array | null {
     const rates = category.values;
@@ -533,11 +532,17 @@ export class ProjectionCalculationService {
     if (totalWeight === 0 || lowest === highest) {
       return null;
     }
-    const poolRate = weightedRate / totalWeight;
+    let wireRate = 0;
+    let wireWeight = 0;
+    for (const position of wirePositions) {
+      wireRate += rates[position] * weights[position];
+      wireWeight += weights[position];
+    }
+    const referenceRate = wireWeight > 0 ? wireRate / wireWeight : weightedRate / totalWeight;
 
     const values = new Float64Array(size);
     for (let position = 0; position < size; position++) {
-      values[position] = category.direction * (rates[position] - poolRate) * weights[position];
+      values[position] = category.direction * (rates[position] - referenceRate) * weights[position];
     }
     return values;
   }

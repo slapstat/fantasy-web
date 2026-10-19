@@ -176,21 +176,6 @@ describe('ProjectionCalculationService.computeZScores', () => {
     });
   });
 
-  it("puts nought at the pool size's best player even when the pool's worst is below him", () => {
-    // The two busiest goalies make the pool, the second of them with ratios nobody would roster.
-    const field = [
-      goalieSeason(1, 60, 2.3, 0.92),
-      goalieSeason(2, 59, 3.4, 0.88),
-      goalieSeason(3, 30, 2.6, 0.91),
-    ];
-
-    const result = service.computeZScores(field, GOALIE_RATIOS, 180, 2);
-
-    expect(result[2]).toBeCloseTo(0, 10);
-    expect(result[0]).toBeGreaterThan(0);
-    expect(result[1]).toBeLessThan(0);
-  });
-
   it('returns an empty array for no projections', () => {
     const result = service.computeZScores([], new Set(['goals']));
 
@@ -447,14 +432,11 @@ describe('ProjectionCalculationService goalie pool', () => {
   // save percentages out of step so volume and rate do not rank them alike, 30 backups, and 24
   // goalies out or in the minors with a game or none left.
   const STARTERS = 24;
-  const starterWins: number[] = [];
   const restOfSeason = (): GoalieProjection[] => {
-    starterWins.length = 0;
     const starters = Array.from({ length: STARTERS }, (_unused, index) => {
       const gp = 58 - Math.floor((index * 18) / (STARTERS - 1));
       const svPct = +(0.914 - ((index * 7) % STARTERS) * (0.024 / STARTERS)).toFixed(3);
       const wins = +(gp * (0.42 + (svPct - 0.89) * 4)).toFixed(1);
-      starterWins.push(wins);
       return withWins(
         goalieSeason(index + 1, gp, +(2.3 + (0.914 - svPct) * 30).toFixed(2), svPct),
         wins,
@@ -478,42 +460,50 @@ describe('ProjectionCalculationService goalie pool', () => {
   it('keeps the starters as the pool when many goalies have a game or none left', () => {
     const scores = service.computeZScores(restOfSeason(), categories, 180, STARTERS);
 
-    // Picked by value, a goalie with no games scores the pool's average on both ratios, outscores
-    // a busy starter whose ratios are under the pool's, takes his seat and drags the pool's spread
-    // in, until the pool is goalies who do not play and the z-scores run to minus thirty.
+    // Against the pool's own rate, a goalie with no games scored exactly average on both ratios,
+    // outscored a busy starter under that average, took his seat and dragged the pool's spread in,
+    // until the pool was goalies who do not play and the z-scores ran to minus thirty. Against the
+    // wire, a starter who leaves the pool makes the wire worse and the rest look better.
     const idle = scores.slice(STARTERS + 30);
     expect(Math.min(...scores.slice(0, STARTERS))).toBeGreaterThan(Math.max(...idle));
     expect([...scores].sort((first, second) => second - first)[STARTERS - 1]).toBeCloseTo(0, 10);
   });
 
-  it("measures the wins' spread over the goalies who play", () => {
+  // Three goalies for a pool of three, the third at exactly their rate; a wire of two behind them;
+  // and a goalie with no games.
+  const withWire = (): GoalieProjection[] => [
+    goalieSeason(1, 60, 2.4, 0.915),
+    goalieSeason(2, 60, 2.8, 0.9),
+    goalieSeason(3, 60, 2.6, 0.908),
+    goalieSeason(4, 50, 3.2, 0.89),
+    goalieSeason(5, 50, 3.4, 0.885),
+    goalie(6, {}, 0),
+  ];
+
+  it("measures a goalie's ratios against the wire, so his minutes count when he is better", () => {
     const contributions = service.computeZScoreContributions(
-      restOfSeason(),
-      categories,
+      withWire(),
+      new Set<ScoringStatKey>(['gaa']),
       180,
-      STARTERS,
-    );
-    const mean = starterWins.reduce((total, value) => total + value, 0) / STARTERS;
-    const stdDev = Math.sqrt(
-      starterWins.reduce((total, value) => total + (value - mean) ** 2, 0) / STARTERS,
+      3,
     );
 
-    expect(contributions[0]['w'] - contributions[1]['w']).toBeCloseTo(
-      (starterWins[0] - starterWins[1]) / stdDev,
-      10,
-    );
+    // At the pool's own rate he was worth exactly what a goalie who never plays is worth.
+    expect(contributions[2]['gaa']).toBeGreaterThan(contributions[5]['gaa']);
+    // The wire's best, at the wire's rate, is worth what the goalie with no games is.
+    expect(contributions[3]['gaa']).toBeCloseTo(contributions[5]['gaa'], 10);
   });
 
-  it('settles a tie in games at the edge of the pool by value', () => {
-    const field = [24, 30, 36, 18, 28].map((w, index) =>
-      withWins(goalieSeason(index + 1, 60, 2.7, 0.905), w),
-    );
+  it('measures a week against the same wire, so the two origins still differ by one constant', () => {
+    const categories = new Set<ScoringStatKey>(['w', 'gaa', 'svPct']);
+    const field = withWire().map((line, index) => withWins(line, [30, 26, 28, 18, 16, 0][index]));
 
-    const scores = service.computeZScores(field, new Set<ScoringStatKey>(['w']), 180, 3);
+    const season = service.computeZScores(field, categories, 180, 3);
+    const week = service.computeZScores(field, categories, 180, 3, 'empty');
 
-    // Every goalie plays sixty, so the pool is the three with the most wins, and the third is nought.
-    expect(scores[0]).toBeCloseTo(-4 / Math.sqrt(104 / 9), 10);
-    expect(scores[4]).toBeCloseTo(0, 10);
+    season.forEach((score, index) => {
+      expect(score - week[index]).toBeCloseTo(season[0] - week[0], 10);
+    });
   });
 });
 
