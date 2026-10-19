@@ -65,6 +65,10 @@ export class FeatureService {
   readonly playerScout = computed(() =>
     this.features.hasValue() ? this.features.value().playerScout : false,
   );
+  /** Whether Role Changes is served here. False until the answer lands, like the others. */
+  readonly roleChanges = computed(() =>
+    this.features.hasValue() ? this.features.value().roleChanges : false,
+  );
   /** Whether Start/Bench is served here. False until the answer lands, like the others. */
   readonly startBench = computed(() =>
     this.features.hasValue() ? this.features.value().startBench : false,

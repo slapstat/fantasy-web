@@ -76,26 +76,22 @@ describe('PlayerScoutService', () => {
     return MockBuilder(PlayerScoutService).mock(Api, { invoke });
   });
 
-  const read = (since: string | null = '2026-10-07', recentGames: number | null = null) =>
-    firstValueFrom(
-      TestBed.inject(PlayerScoutService).players('YAHOO', '465.l.9', { since, recentGames }),
-    );
+  const read = (since: string | null = '2026-10-07') =>
+    firstValueFrom(TestBed.inject(PlayerScoutService).players('YAHOO', '465.l.9', { since }));
 
-  it("asks the BFF for the league's players since a day, or the preseason for none, and the ice's window", async () => {
+  it("asks the BFF for the league's players since a day, or the preseason for none", async () => {
     await read();
-    await read(null, 5);
+    await read(null);
 
     expect(invoke).toHaveBeenNthCalledWith(1, playerScoutPlayers, {
       platform: 'YAHOO',
       leagueId: '465.l.9',
       since: '2026-10-07',
-      recentGames: undefined,
     });
     expect(invoke).toHaveBeenNthCalledWith(2, playerScoutPlayers, {
       platform: 'YAHOO',
       leagueId: '465.l.9',
       since: undefined,
-      recentGames: 5,
     });
   });
 
@@ -126,13 +122,6 @@ describe('PlayerScoutService', () => {
     expect(montour.thenProjected.has('ppp')).toBe(false);
   });
 
-  it('carries the ice since the day as the BFF sent it', async () => {
-    const montour = (await read()).players[0];
-
-    expect(montour.usage?.recent.toiPerGame).toBe(1380);
-    expect(montour.usage?.baselineSource).toBe('SEASON');
-  });
-
   it('reads who holds a rostered player, and gives him no availability', async () => {
     const makar = (await read()).players[1];
 
@@ -141,7 +130,6 @@ describe('PlayerScoutService', () => {
     expect(makar.injuryStatus).toBe('DTD');
     expect(makar.freeAgent.availability).toBe('UNKNOWN');
     expect(makar.then).toBeNull();
-    expect(makar.usage).toBeNull();
   });
 
   it('shapes a goalie over his starts', async () => {
@@ -158,7 +146,6 @@ describe('PlayerScoutService', () => {
     expect(list.inSeason).toBe(true);
     expect(list.since.kind).toBe('SNAPSHOT');
     expect(list.since.resolved).toBe('2026-10-07');
-    expect(list.recentGames).toBeNull();
   });
 
   it("reads the user's team with each player's line, and every club's nights by the NHL's spelling", async () => {

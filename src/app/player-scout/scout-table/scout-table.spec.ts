@@ -3,8 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Projection } from '../../models/projection.model';
 import { ScoutPlayer } from '../../services/player-scout.service';
 import { ScoutRow } from '../scout-ranking';
-import { usageChange } from '../scout-usage';
-import { ScoutTableComponent, ScoutView } from './scout-table';
+import { ScoutTableComponent } from './scout-table';
 
 function skater(playerId: number, goals: number, toi: number, games = 70): Projection {
   return {
@@ -26,7 +25,6 @@ interface RowOptions {
   readonly rising?: boolean;
   readonly owner?: ScoutPlayer['owner'];
   readonly availability?: ScoutPlayer['freeAgent']['availability'];
-  readonly usage?: ScoutPlayer['usage'];
 }
 
 function row(playerId: number, name: string, rank: number, options: RowOptions = {}): ScoutRow {
@@ -53,7 +51,6 @@ function row(playerId: number, name: string, rank: number, options: RowOptions =
     owner: options.owner ?? null,
     then,
     thenProjected: new Set(then ? ['goals', 'assists'] : []),
-    usage: options.usage ?? null,
   };
   return {
     scout,
@@ -68,11 +65,10 @@ function row(playerId: number, name: string, rank: number, options: RowOptions =
     delta: then ? (options.delta ?? 0) : null,
     rise: thenRank === null ? null : thenRank - rank,
     rising: options.rising ?? false,
-    usage: usageChange(scout.usage),
   };
 }
 
-/** A goalie's row: no ice time, now or then, and no usage. */
+/** A goalie's row: no ice time, now or then. */
 function goalieRow(playerId: number, rank: number): ScoutRow {
   const line: Projection = {
     type: 'goalie',
@@ -93,14 +89,6 @@ function goalieRow(playerId: number, rank: number): ScoutRow {
   };
 }
 
-const USAGE: ScoutPlayer['usage'] = {
-  recent: { games: 4, toiPerGame: 1380, ppToiPerGame: 200, ppShare: 0.8 },
-  baseline: { games: 6, toiPerGame: 1050, ppToiPerGame: 60, ppShare: 0.1 },
-  baselineSource: 'SEASON',
-  listedNow: { seenOn: '2026-10-13', line: 'd1', powerPlayUnit: 1, outOfLineup: false },
-  listedBefore: { seenOn: '2026-10-06', line: 'd3', outOfLineup: false },
-};
-
 /** Presses the heading whose label this is. */
 function press(fixture: ReturnType<typeof MockRender<ScoutTableComponent>>, label: string): void {
   ngMocks
@@ -115,7 +103,6 @@ describe('ScoutTableComponent', () => {
   function render(
     rows: ScoutRow[],
     extra: {
-      view?: ScoutView;
       compare?: boolean;
       gains?: ReadonlyMap<string, number | null> | null;
       dropName?: string;
@@ -129,7 +116,6 @@ describe('ScoutTableComponent', () => {
       scoringType: 'points',
       categories: ['goals', 'assists'],
       sinceLabel: 'vs 7 Oct',
-      iceLabel: "each club's last 5 games",
       ...extra,
     });
   }
@@ -215,57 +201,6 @@ describe('ScoutTableComponent', () => {
     expect(ngMocks.find(fixture, 'td.score-col .delta').nativeElement.classList).toContain(
       'delta--down',
     );
-  });
-
-  it('shows the ice view: the games, ice and power play with their changes, and the lineup', () => {
-    const fixture = render([row(1, 'Brandon Montour', 1, { usage: USAGE })], { view: 'ice' });
-
-    const group = ngMocks.find(fixture, '.group-col--start');
-    expect(ngMocks.formatText(group)).toContain('On the ice');
-    expect(ngMocks.formatText(group)).toContain("each club's last 5 games");
-    const headings = ngMocks
-      .findAll(fixture, 'thead tr:last-child th')
-      .map((th) => ngMocks.formatText(th));
-    expect(headings).toEqual([
-      '#',
-      'Player',
-      'Points',
-      'Games',
-      'Ice / game',
-      'PP / game',
-      'PP share',
-      'Lineup',
-    ]);
-    expect(ngMocks.findAll(fixture, 'th.toi-col')).toHaveLength(0);
-    expect(ngMocks.findAll(fixture, 'th.stat-col')).toHaveLength(0);
-    const cells = ngMocks.findAll(fixture, 'tbody td').map((td) => ngMocks.formatText(td));
-    expect(cells[0]).toBe('1');
-    expect(cells[1]).toBe('85.0');
-    expect(cells[2]).toBe('4');
-    expect(cells[3]).toBe('23:00+5:30');
-    expect(cells[4]).toBe('3:20+2:20');
-    expect(cells[5]).toBe('80%+70 pts');
-    const lineup = ngMocks.find(fixture, 'td.lineup-col');
-    expect(ngMocks.formatText(ngMocks.find(lineup, '.listed'))).toBe('D1 · PP1');
-    expect(ngMocks.find(lineup, '.listed').nativeElement.classList).toContain('listed--up');
-    expect(ngMocks.formatText(ngMocks.find(lineup, '.delta--note'))).toBe('was D3 · No PP');
-  });
-
-  it('leaves the comparison to the projection view', () => {
-    const fixture = render([risen()], { view: 'ice', compare: true });
-
-    expect(ngMocks.findAll(fixture, 'td.score-col .delta')).toHaveLength(0);
-    expect(ngMocks.findAll(fixture, 'td.rank-col .delta')).toHaveLength(0);
-    expect(ngMocks.findAll(fixture, '.scout-tag--rising')).toHaveLength(0);
-  });
-
-  it('leaves the ice cells of a goalie, or a skater with no recent game, empty', () => {
-    const fixture = render([row(1, 'Brandon Montour', 1), goalieRow(2, 2)], { view: 'ice' });
-
-    const rows = ngMocks.findAll(fixture, 'tbody tr');
-    expect(ngMocks.formatText(ngMocks.findAll(rows[0], 'td')[3])).toBe('');
-    expect(ngMocks.formatText(ngMocks.findAll(rows[1], 'td')[3])).toBe('');
-    expect(ngMocks.findAll(fixture, 'td.lineup-col')).toHaveLength(2);
   });
 
   it('lists a goalie among the skaters with his ice time cell empty, and heads none over goalies alone', () => {
@@ -366,21 +301,6 @@ describe('ScoutTableComponent', () => {
     expect(ngMocks.findAll(render([row(1, 'Brandon Montour', 1)]), '.sort--delta')).toHaveLength(0);
   });
 
-  it('asks the page to sort the ice view by the ice or the power play', () => {
-    const sortBy = vi.fn();
-    const fixture = MockRender(ScoutTableComponent, {
-      rows: [row(1, 'Brandon Montour', 1, { usage: USAGE })],
-      scoringType: 'points',
-      categories: ['goals', 'assists'],
-      view: 'ice',
-      sortBy,
-    });
-    press(fixture, 'Ice / game');
-    press(fixture, 'PP share');
-
-    expect(sortBy.mock.calls).toEqual([['ice'], ['powerPlay']]);
-  });
-
   it('marks the column the list is sorted by, and which way', () => {
     const fixture = MockRender(ScoutTableComponent, {
       rows: [row(1, 'Brandon Montour', 1)],
@@ -395,18 +315,10 @@ describe('ScoutTableComponent', () => {
     expect(sorted[0].nativeElement.getAttribute('aria-sort')).toBe('ascending');
   });
 
-  it('has no gain columns without a drop, nor in the ice view', () => {
+  it('has no gain columns without a drop', () => {
     const none = render([row(1, 'Brandon Montour', 1)]);
     expect(ngMocks.findAll(none, '.gain-col, .score-gain-col, .player-gains')).toHaveLength(0);
     expect(ngMocks.findAll(none, '.group-row')).toHaveLength(0);
-    const ice = render([row(1, 'Brandon Montour', 1)], {
-      view: 'ice',
-      gains: new Map(),
-      dropName: 'Hughes',
-      dropScore: 60,
-    });
-    expect(ngMocks.findAll(ice, '.gain-col, .score-gain-col, .player-gains')).toHaveLength(0);
-    expect(ngMocks.formatText(ice)).not.toContain('vs Hughes');
   });
 
   it('heads a sortable gain column by the drop, each gain inked by its sign, the three biggest washed in green and a pickup it could not price as a question', () => {

@@ -9,11 +9,10 @@ import {
   RankedFreeAgent,
   sortFreeAgents,
 } from '../streamer-planner/planner-free-agents';
-import { usageChange, UsageChange } from './scout-usage';
 
 /**
  * A player in the league ranked on today's rest of the season, beside his place and score on the
- * model's line as it stood on the chosen day, and what the ice says since. The planner's row, so
+ * model's line as it stood on the chosen day. The planner's row, so
  * its table helpers draw it.
  */
 export interface ScoutRow extends RankedFreeAgent {
@@ -30,7 +29,6 @@ export interface ScoutRow extends RankedFreeAgent {
   readonly rise: number | null;
   /** Risen far enough that a draft would have taken him had it known: see {@link isRising}. */
   readonly rising: boolean;
-  readonly usage: UsageChange | null;
 }
 
 /** Fewer places than this is the noise of a ranking, not a change of role. */
@@ -100,7 +98,6 @@ export function rankScout(
       delta: thenScore === null ? null : score - thenScore,
       rise: thenRank === null ? null : thenRank - place,
       rising: isRising(place, thenRank),
-      usage: usageChange(player.usage),
     });
   }
   return rows;
@@ -127,10 +124,10 @@ export function statOf(line: Projection | null, key: string): number | null {
 // --- Sorting the list ----------------------------------------------------------------------------
 
 /**
- * A column the list can be sorted by: the planner's, the change in score, the places gained, the
- * two measured changes on the ice, and what the lineup gains by a pickup against the chosen drop.
+ * A column the list can be sorted by: the planner's, the change in score, the places gained, and
+ * what the lineup gains by a pickup against the chosen drop.
  */
-export type ScoutSortKey = FreeAgentSortKey | 'delta' | 'rise' | 'ice' | 'powerPlay' | 'gain';
+export type ScoutSortKey = FreeAgentSortKey | 'delta' | 'rise' | 'gain';
 
 export interface ScoutSort {
   readonly key: ScoutSortKey;
@@ -143,7 +140,7 @@ export const SCOUT_RANKED_ORDER: ScoutSort = RANKED_ORDER;
 /** The order the page opens in: the players the model makes the most more of since the day. */
 export const SCOUT_MOVERS_ORDER: ScoutSort = { key: 'delta', descending: true };
 
-const SCOUT_OWN_KEYS: readonly ScoutSortKey[] = ['delta', 'rise', 'ice', 'powerPlay', 'gain'];
+const SCOUT_OWN_KEYS: readonly ScoutSortKey[] = ['delta', 'rise', 'gain'];
 
 /**
  * Sorts by a column, best first, whichever end of the scale that is: the furthest risen first, and
@@ -171,10 +168,6 @@ function scoutSortValue(
       return row.delta;
     case 'rise':
       return row.rise;
-    case 'ice':
-      return row.usage?.iceChange ?? null;
-    case 'powerPlay':
-      return row.usage?.powerPlayShareChange ?? null;
     case 'gain':
       return gains.get(row.player.playerId) ?? null;
   }

@@ -31,6 +31,9 @@
           @if (features.startBench()) {
             <a routerLink="/start-bench" routerLinkActive="active">Start/Bench</a>
           }
+          @if (features.roleChanges()) {
+            <a routerLink="/role-changes" routerLinkActive="active">Role Changes</a>
+          }
           <!-- The one link in the header that sells something, and only to an account that has
                not bought it. It used to be an "Account" link to the subscription page, beside an
                avatar that also opened an account menu: two doors marked the same, one of them
@@ -148,6 +151,17 @@
         ariaCurrentWhenActive="page"
       >
         Start/Bench
+      </a>
+    }
+    @if (features.roleChanges()) {
+      <a
+        class="nav-menu-item nav-menu-item--collapsed"
+        cdkMenuItem
+        routerLink="/role-changes"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+      >
+        Role Changes
       </a>
     }
     @if (showsPremiumLink()) {

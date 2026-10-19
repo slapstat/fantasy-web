@@ -20,12 +20,7 @@ import { YahooConnectReturnService } from '../services/yahoo-connect-return.serv
 import { YahooService } from '../services/yahoo.service';
 import { ErrorStateComponent } from '../shared/error-state/error-state';
 import { YahooLeaguePicker } from '../shared/yahoo-league-picker';
-import {
-  DEFAULT_RECENT_GAMES,
-  PlayerScoutComponent,
-  SCOUT_PAGE_SIZE,
-  surname,
-} from './player-scout';
+import { PlayerScoutComponent, SCOUT_PAGE_SIZE, surname } from './player-scout';
 import { ScoutTableComponent } from './scout-table/scout-table';
 import { SincePickerComponent } from './since-picker/since-picker';
 
@@ -97,7 +92,6 @@ function scoutPlayer(
     owner,
     then,
     thenProjected: new Set(then ? ['goals', 'assists'] : []),
-    usage: null,
     ...extra,
   };
 }
@@ -174,7 +168,6 @@ function league(): ScoutList {
       resolved: '2026-10-07',
       earliestSnapshot: '2026-10-08',
     },
-    recentGames: DEFAULT_RECENT_GAMES,
     players: [
       ...depth,
       scoutPlayer(skater(99, 12, 40), skater(99, 4, 10), ['D']),
@@ -246,20 +239,16 @@ describe('PlayerScoutComponent', () => {
     expect(players).not.toHaveBeenCalled();
   });
 
-  it("reads the chosen league's players with no day and the ice over the last five games", async () => {
+  it("reads the chosen league's players with no day", async () => {
     await render();
 
-    expect(players).toHaveBeenCalledWith('YAHOO', '465.l.9', {
-      since: null,
-      recentGames: DEFAULT_RECENT_GAMES,
-    });
+    expect(players).toHaveBeenCalledWith('YAHOO', '465.l.9', { since: null });
   });
 
   it("opens on today's projection of the available players, best first, with no comparison", async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
 
-    expect(page.view()).toBe('projection');
     expect(page.compare()).toBe(false);
     expect(page.pool()).toBe('available');
     expect(page.sort()).toEqual({ key: 'score', descending: true });
@@ -268,7 +257,6 @@ describe('PlayerScoutComponent', () => {
     expect(ids(page.filtered())).not.toContain('301');
     const table = ngMocks.find(fixture, ScoutTableComponent);
     expect(ngMocks.input(table, 'compare')).toBe(false);
-    expect(ngMocks.input(table, 'view')).toBe('projection');
     expect(ngMocks.input(ngMocks.find(fixture, SincePickerComponent), 'on')).toBe(false);
     // The floor of the day picker is known before any comparison is on.
     expect(ngMocks.input(ngMocks.find(fixture, SincePickerComponent), 'earliestKept')).toBe(
@@ -317,7 +305,7 @@ describe('PlayerScoutComponent', () => {
     page.since.set('2026-10-05');
     await fixture.whenStable();
 
-    expect(query(players.mock.lastCall!)).toEqual({ since: '2026-10-05', recentGames: 5 });
+    expect(query(players.mock.lastCall!)).toEqual({ since: '2026-10-05' });
   });
 
   it('narrows to the risers, or the fallers, only with a comparison on', async () => {
@@ -412,32 +400,6 @@ describe('PlayerScoutComponent', () => {
     ]);
   });
 
-  it('switches to the ice view, with its window read over the last games or since the day', async () => {
-    const fixture = await render();
-    const page = fixture.point.componentInstance;
-
-    page.view.set('ice');
-    fixture.detectChanges();
-
-    expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'view')).toBe('ice');
-    expect(page.iceLabel()).toBe("each club's last 5 games");
-    expect(page.gains()).toBeNull();
-
-    page.recentGames.set(10);
-    await fixture.whenStable();
-    expect(query(players.mock.lastCall!)).toEqual({ since: null, recentGames: 10 });
-
-    // "Since the day" needs a day: without a comparison on a day it falls back to the last games.
-    page.iceWindowPicked.set('since');
-    expect(page.iceWindow()).toBe('last');
-    page.compare.set(true);
-    page.since.set('2026-10-05');
-    await fixture.whenStable();
-    expect(page.iceWindow()).toBe('since');
-    expect(page.iceLabel()).toBe('since 5 Oct');
-    expect(query(players.mock.lastCall!)).toEqual({ since: '2026-10-05', recentGames: null });
-  });
-
   it('hands the table a page at a time, saying who holds whom only beyond the wire', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
@@ -467,22 +429,18 @@ describe('PlayerScoutComponent', () => {
       descending: false,
     });
 
-    // A change without a comparison, or games in the ice view, sorts by blanks: ranked instead.
+    // A change without a comparison sorts by blanks: ranked instead.
     page.sortBy('delta');
     expect(page.sort()).toEqual({ key: 'score', descending: true });
     page.toggleCompare();
     page.sortBy('rise');
     expect(page.sort().key).toBe('rise');
-    page.view.set('ice');
+    page.toggleCompare();
     expect(page.sort()).toEqual({ key: 'score', descending: true });
-    page.sortBy('ice');
-    expect(page.sort().key).toBe('ice');
   });
 
   it('says the season is not under way rather than listing nobody', async () => {
-    players.mockReturnValue(
-      of({ inSeason: false, since: { kind: 'NONE' }, recentGames: null, players: [] }),
-    );
+    players.mockReturnValue(of({ inSeason: false, since: { kind: 'NONE' }, players: [] }));
     const fixture = await render();
 
     expect(ngMocks.formatText(fixture)).toContain("The season hasn't started yet.");
@@ -863,10 +821,6 @@ describe('PlayerScoutComponent', () => {
     expect(page.gains()?.get(first.player.playerId)).toBe(
       Math.max(...[...page.gains()!.values()].map((gain) => gain ?? -Infinity)),
     );
-
-    // Without a gain column the sort falls back to the ranking.
-    page.view.set('ice');
-    expect(page.sort()).toEqual({ key: 'score', descending: true });
   });
 
   it('offers neither a drop nor a gain column while a pickup costs nobody', async () => {
@@ -972,7 +926,7 @@ describe('PlayerScoutComponent', () => {
     await fixture.whenStable();
 
     expect(page.compare()).toBe(true);
-    expect(query(players.mock.lastCall!)).toEqual({ since: '2026-10-05', recentGames: 5 });
+    expect(query(players.mock.lastCall!)).toEqual({ since: '2026-10-05' });
 
     page.clearCompare();
     await fixture.whenStable();
@@ -980,11 +934,11 @@ describe('PlayerScoutComponent', () => {
 
     expect(page.compare()).toBe(false);
     expect(page.since()).toBe('2026-10-05');
-    expect(query(players.mock.lastCall!)).toEqual({ since: null, recentGames: 5 });
+    expect(query(players.mock.lastCall!)).toEqual({ since: null });
     expect(ngMocks.input(ngMocks.find(fixture, SincePickerComponent), 'since')).toBe('2026-10-05');
   });
 
-  it('keeps the view band on the list through a reload, and the room line off until it is back', async () => {
+  it('keeps the comparison band on the list through a reload, and the room line off until it is back', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
     expect(page.listReady()).toBe(true);

@@ -108,6 +108,13 @@ describe('FeatureService', () => {
     expect((await answered()).playerScout()).toEqual(true);
   });
 
+  it('reports Role Changes as the BFF does, and off until it answers', async () => {
+    invoke.mockResolvedValue({ aiProjection: true, roleChanges: true });
+    expect(TestBed.inject(FeatureService).roleChanges()).toEqual(false);
+
+    expect((await answered()).roleChanges()).toEqual(true);
+  });
+
   it('is not settled while the BFF has yet to answer', () => {
     invoke.mockReturnValue(new Promise(() => undefined));
 

@@ -401,17 +401,20 @@ guard scripts in `.github/scripts/` (`check-build-placeholders.sh`, `check-deplo
   dropped by container query where the card is narrow. A
   category the BFF sent no number for is an empty cell, never written as the zero the ranking engine
   was handed (`FreeAgent.projected`).
+- `role-changes/` — the **Role Changes** page (`/role-changes`, signed in, served only where the
+  BFF's `roleChanges` feature says so, `ROLE_CHANGES_ENABLED`): skaters whose ice a game or share
+  of the club's power play moved over the club's last 3/5/10 games against their baseline, and
+  where Daily Faceoff lists them now and before (`role-changes.model.ts`: `rankRoleChanges`,
+  rising or falling, ice or power play, F/D, Min GP, search). Restored on 2026-10-19 as it stood
+  before Player Scout folded it in, on the BFF's own `GET /api/v1/role-changes`.
 - `player-scout/` — the **Player Scout** page (`/player-scout`, signed in, served only where the
-  BFF's `playerScout` feature says so; `/fa-scout` and `/role-changes`, the two pages it
-  replaced, redirect to it): every player in a league on the AI projection for the rest of the
-  season, with how the projection has moved since a chosen day on a switch, and what the ice has
-  shown in a view of its own. The league is picked with the planner's own field
-  (`app-league-field`, `YahooLeaguePicker`) and opens on `LeagueChoiceService`'s league. **Two
-  views** (`ScoutView`, switched like the planner's): *Projection* (score, games, ice time, the
-  league's categories, and the gain against the chosen drop) and *On the ice* (measured ice a game, PP ice, PP share and the
-  Daily Faceoff listing over each club's last 3/5/10 games, or since the comparison's day,
-  against his games before; `scout-usage.ts`, the old Role Changes model; the BFF's
-  `recentGames`). Both keep the rank, the player and the score to sort by. **The comparison is
+  BFF's `playerScout` feature says so; `/fa-scout`, the page it replaced, redirects to it): every
+  player in a league on the AI projection for the rest of the season, with how the projection has
+  moved since a chosen day on a switch. The league is picked with the planner's own field
+  (`app-league-field`, `YahooLeaguePicker`) and opens on `LeagueChoiceService`'s league. One table:
+  score, games, ice time, the league's categories, and the gain against the chosen drop. The
+  measured ice had a view of its own here from 2026-10-14 to 2026-10-19; it is Role Changes'
+  again (`role-changes/`). **The comparison is
   off by default**: a tick switches it on, against the preseason projection or the one of a day
   typed into the field (`since-picker/`; the caption says which day the BFF actually answered,
   since nothing is kept from before the history began). With it on, every figure wears its change

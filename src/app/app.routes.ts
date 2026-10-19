@@ -8,6 +8,7 @@ import { whosHotEnabledGuard } from './guards/whos-hot-enabled.guard';
 import { draftAnalysisEnabledGuard } from './guards/draft-analysis-enabled.guard';
 import { startBenchEnabledGuard } from './guards/start-bench-enabled.guard';
 import { playerScoutEnabledGuard } from './guards/player-scout-enabled.guard';
+import { roleChangesEnabledGuard } from './guards/role-changes-enabled.guard';
 import { demoRedemptionGuard } from './guards/demo-redemption.guard';
 import { DESCRIPTION, INDEXABLE } from './shared/crawl-tags';
 
@@ -161,9 +162,14 @@ export const routes: Routes = [
     loadComponent: () => import('./player-scout/player-scout').then((m) => m.PlayerScoutComponent),
     canActivate: [authGuard, playerScoutEnabledGuard],
   },
-  // The two pages Player Scout replaced: a bookmark or a link to either lands on it.
+  // The page Player Scout replaced: a bookmark or a link to it lands on it.
   { path: 'fa-scout', redirectTo: 'player-scout', pathMatch: 'full' },
-  { path: 'role-changes', redirectTo: 'player-scout', pathMatch: 'full' },
+  // Served only where the BFF's ROLE_CHANGES_ENABLED says so, and signed in like Who's Hot.
+  {
+    path: 'role-changes',
+    loadComponent: () => import('./role-changes/role-changes').then((m) => m.RoleChangesComponent),
+    canActivate: [authGuard, roleChangesEnabledGuard],
+  },
   // Served only where the BFF's START_BENCH_ENABLED says so, and signed in like the planner.
   {
     path: 'start-bench',

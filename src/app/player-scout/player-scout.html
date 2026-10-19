@@ -382,123 +382,58 @@
         </ng-template>
       }
 
-      <!-- Which columns: the view, and what the view asks for, on a band on the table itself, so
-           the switch sits with the columns it changes and the setting sits with its switch. The
-           band stays through a reload, so changing the day does not take the control away. -->
+      <!-- The comparison, on a band on the table itself, so the setting sits with the columns it
+           changes. The band stays through a reload, so changing the day does not take the control
+           away. -->
       <div class="list">
         <div class="viewbar">
-          <div class="views" role="group" aria-label="What to show">
-            <button
-              type="button"
-              class="view"
-              [class.view--active]="view() === 'projection'"
-              [attr.aria-pressed]="view() === 'projection'"
-              (click)="view.set('projection')"
-            >
-              Projection
-            </button>
-            <button
-              type="button"
-              class="view"
-              [class.view--active]="view() === 'ice'"
-              [attr.aria-pressed]="view() === 'ice'"
-              (click)="view.set('ice')"
-            >
-              On the ice
-            </button>
+          <!-- The comparison: off, the list is today's projection and nothing else. -->
+          <div class="setting">
+            <span class="field-label">Compare with</span>
+            <app-since-picker
+              [on]="compare()"
+              [since]="since()"
+              [today]="today"
+              [earliestKept]="earliestKept()"
+              (sinceChange)="pickSince($event)"
+              (cleared)="clearCompare()"
+            />
           </div>
-          @if (view() === 'projection') {
-            <!-- The comparison: off, the list is today's projection and nothing else. -->
+          @if (compare()) {
             <div class="setting">
-              <span class="field-label">Compare with</span>
-              <app-since-picker
-                [on]="compare()"
-                [since]="since()"
-                [today]="today"
-                [earliestKept]="earliestKept()"
-                (sinceChange)="pickSince($event)"
-                (cleared)="clearCompare()"
-              />
-            </div>
-            @if (compare()) {
-              <div class="setting">
-                <span class="field-label">Moved</span>
-                <div class="segmented" role="group" aria-label="Which way the projection moved">
-                  <button
-                    type="button"
-                    [class.active]="movers() === 'all'"
-                    [attr.aria-pressed]="movers() === 'all'"
-                    (click)="movers.set('all')"
-                  >
-                    All
-                  </button>
-                  <button
-                    type="button"
-                    class="movers--risers"
-                    [class.active]="movers() === 'risers'"
-                    [attr.aria-pressed]="movers() === 'risers'"
-                    (click)="movers.set('risers')"
-                  >
-                    Risers
-                  </button>
-                  <button
-                    type="button"
-                    class="movers--fallers"
-                    [class.active]="movers() === 'fallers'"
-                    [attr.aria-pressed]="movers() === 'fallers'"
-                    (click)="movers.set('fallers')"
-                  >
-                    Fallers
-                  </button>
-                </div>
+              <span class="field-label">Moved</span>
+              <div class="segmented" role="group" aria-label="Which way the projection moved">
+                <button
+                  type="button"
+                  [class.active]="movers() === 'all'"
+                  [attr.aria-pressed]="movers() === 'all'"
+                  (click)="movers.set('all')"
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  class="movers--risers"
+                  [class.active]="movers() === 'risers'"
+                  [attr.aria-pressed]="movers() === 'risers'"
+                  (click)="movers.set('risers')"
+                >
+                  Risers
+                </button>
+                <button
+                  type="button"
+                  class="movers--fallers"
+                  [class.active]="movers() === 'fallers'"
+                  [attr.aria-pressed]="movers() === 'fallers'"
+                  (click)="movers.set('fallers')"
+                >
+                  Fallers
+                </button>
               </div>
-              @if (sinceCaption(); as caption) {
-                <p class="caption" aria-live="polite">{{ caption }}</p>
-              }
+            </div>
+            @if (sinceCaption(); as caption) {
+              <p class="caption" aria-live="polite">{{ caption }}</p>
             }
-          } @else {
-            <!-- The ice's window: each club's last few games, or since the comparison's day. One
-                 game says nothing, so the smallest stretch offered is three. -->
-            <div class="setting">
-              <span class="field-label">Over</span>
-              <div class="segmented" role="group" aria-label="The games the ice is read over">
-                <button
-                  type="button"
-                  [class.active]="iceWindow() === 'last'"
-                  [attr.aria-pressed]="iceWindow() === 'last'"
-                  (click)="iceWindowPicked.set('last')"
-                >
-                  Each club's last
-                </button>
-                <button
-                  type="button"
-                  [class.active]="iceWindow() === 'since'"
-                  [attr.aria-pressed]="iceWindow() === 'since'"
-                  [disabled]="!compare() || since() === null"
-                  appTooltip="Pick a comparison day in the projection view first"
-                  (click)="iceWindowPicked.set('since')"
-                >
-                  Since the chosen day
-                </button>
-              </div>
-              @if (iceWindow() === 'last') {
-                <select
-                  aria-label="Recent games"
-                  [value]="recentGames()"
-                  (change)="onRecentGames($event)"
-                >
-                  @for (option of recentGameOptions; track option) {
-                    <option [value]="option" [selected]="option === recentGames()">
-                      {{ option }} games
-                    </option>
-                  }
-                </select>
-              }
-            </div>
-            <p class="caption">
-              Measured ice over {{ iceLabel() }}, against his earlier games this season (or last
-              season while this one is short). Hover a figure for the games it stands on.
-            </p>
           }
         </div>
 
@@ -523,10 +458,8 @@
             [rows]="visible()"
             [scoringType]="scoringType()"
             [categories]="categories()"
-            [view]="view()"
             [compare]="compare()"
             [sinceLabel]="sinceLabel()"
-            [iceLabel]="iceLabel()"
             [showOwner]="pool() === 'all' || pool() === 'taken' || showMine()"
             [gains]="gains()"
             [dropName]="dropSurname()"

@@ -6,6 +6,7 @@ import { authGuard } from './guards/auth.guard';
 import { whosHotEnabledGuard } from './guards/whos-hot-enabled.guard';
 import { demoRedemptionGuard } from './guards/demo-redemption.guard';
 import { playerScoutEnabledGuard } from './guards/player-scout-enabled.guard';
+import { roleChangesEnabledGuard } from './guards/role-changes-enabled.guard';
 
 describe('routes', () => {
   const routeFor = (path: string): Route => routes.find((route) => route.path === path)!;
@@ -71,12 +72,14 @@ describe('routes', () => {
     expect(routeFor('player-scout').canActivate).toEqual([authGuard, playerScoutEnabledGuard]);
   });
 
-  it('sends the two pages Player Scout replaced to it', () => {
-    // A bookmark to FA Scout or Role Changes, or a link in an old thread, still lands somewhere.
-    for (const path of ['fa-scout', 'role-changes']) {
-      expect(routeFor(path).redirectTo).toEqual('player-scout');
-      expect(routeFor(path).pathMatch).toEqual('full');
-    }
+  it('sends the page Player Scout replaced to it', () => {
+    // A bookmark to FA Scout, or a link in an old thread, still lands somewhere.
+    expect(routeFor('fa-scout').redirectTo).toEqual('player-scout');
+    expect(routeFor('fa-scout').pathMatch).toEqual('full');
+  });
+
+  it('serves Role Changes signed in and only where the BFF switches it on', () => {
+    expect(routeFor('role-changes').canActivate).toEqual([authGuard, roleChangesEnabledGuard]);
   });
 
   it('catches an unknown address instead of letting the router throw', () => {

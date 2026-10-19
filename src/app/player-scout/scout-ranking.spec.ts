@@ -52,7 +52,6 @@ export function player(
     owner: null,
     then,
     thenProjected: new Set(then ? ['points'] : []),
-    usage: null,
     ...extra,
   };
 }
@@ -152,29 +151,6 @@ describe('rankScout', () => {
     // His 20 wins now are below every skater; his 25 on the day were above Montour's 20.
     expect([row?.rank, row?.thenRank, row?.rise, row?.delta]).toEqual([18, 16, -2, -5]);
   });
-
-  it('reads the ice since the day into the row', () => {
-    const [row] = rankScout(
-      [
-        player(skaterLine(1, 30), skaterLine(1, 20), {
-          usage: {
-            recent: { games: 4, toiPerGame: 1080, ppShare: 0.8 },
-            baseline: { games: 6, toiPerGame: 720, ppShare: 0.1 },
-            baselineSource: 'SEASON',
-            listedNow: { seenOn: '2026-10-13', line: 'f2', powerPlayUnit: 1, outOfLineup: false },
-            listedBefore: { seenOn: '2026-10-06', line: 'f4', outOfLineup: false },
-          },
-        }),
-      ],
-      byValue,
-      fantasyPoints,
-    );
-
-    expect(row.usage?.iceChange).toBe(360);
-    expect(row.usage?.powerPlayShareChange).toBeCloseTo(0.7);
-    expect(row.usage?.lineMove).toEqual({ from: 'L4', to: 'L2' });
-    expect(row.usage?.powerPlayMove).toEqual({ from: 'No PP', to: 'PP1' });
-  });
 });
 
 describe('what a line reads', () => {
@@ -222,25 +198,6 @@ describe('sorting the scout list', () => {
     expect(ids(sortScout(rows, { key: 'rise', descending: false }))).toEqual(['4', '3', '2', '1']);
   });
 
-  it('sorts by the ice since the day, players without any last', () => {
-    const measured = rankScout(
-      [
-        player(skaterLine(1, 30), null),
-        player(skaterLine(2, 20), null, {
-          usage: { recent: { games: 3, toiPerGame: 900 }, baseline: { games: 5, toiPerGame: 600 } },
-        }),
-        player(skaterLine(3, 10), null, {
-          usage: { recent: { games: 3, toiPerGame: 900 }, baseline: { games: 5, toiPerGame: 960 } },
-        }),
-      ],
-      byValue,
-      fantasyPoints,
-    );
-
-    expect(ids(sortScout(measured, { key: 'ice', descending: true }))).toEqual(['2', '3', '1']);
-    expect(ids(sortScout(measured, { key: 'ice', descending: false }))).toEqual(['3', '2', '1']);
-  });
-
   it('sorts by the gain against the chosen drop, the biggest first, a pickup it could not price last', () => {
     const gains = new Map<string, number | null>([
       ['1', -4],
@@ -275,7 +232,7 @@ describe('sorting the scout list', () => {
     expect(rise).toEqual({ key: 'rise', descending: true });
     expect(nextScoutSort(rise, 'rise')).toEqual({ key: 'rise', descending: false });
     expect(nextScoutSort(rise, 'delta')).toEqual({ key: 'delta', descending: true });
-    expect(nextScoutSort(rise, 'powerPlay')).toEqual({ key: 'powerPlay', descending: true });
+    expect(nextScoutSort(rise, 'gain')).toEqual({ key: 'gain', descending: true });
   });
 
   it('opens every other column best first, from the rise too', () => {

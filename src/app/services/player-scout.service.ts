@@ -9,7 +9,6 @@ import { ScoutLine } from '../api/models/scout-line';
 import { ScoutMyTeamResponse } from '../api/models/scout-my-team-response';
 import { ScoutRosterPlayer } from '../api/models/scout-roster-player';
 import { ScoutSince } from '../api/models/scout-since';
-import { ScoutUsage } from '../api/models/scout-usage';
 import { nhlTeamKey } from '../models/nhl-team';
 import { Projection } from '../models/projection.model';
 import {
@@ -22,7 +21,7 @@ import { wholeGamesLine } from '../streamer-planner/planner-free-agents';
 import { FreeAgent } from './streamer-planner-free-agents.service';
 import { LeaguePlatform } from './league-choice.service';
 
-export type { ScoutSince, ScoutUsage };
+export type { ScoutSince };
 
 /** The league team holding a player; null for one the league has available. */
 export interface ScoutOwner {
@@ -34,7 +33,7 @@ export interface ScoutOwner {
  * One player in the league as Player Scout reads him: his rest of the season today, shaped as the
  * planner's {@link FreeAgent} so the same table helpers draw it, the model's line for him as it
  * stood on the chosen day (already re-spread over the games his club has left, so the two compare
- * stat by stat), who holds him, and what the ice says since that day.
+ * stat by stat), and who holds him.
  */
 export interface ScoutPlayer {
   /** Today's rest of the season: `projection` is its line, `expectedGames` its games. */
@@ -49,8 +48,6 @@ export interface ScoutPlayer {
   readonly then: Projection | null;
   /** The stats the chosen day's line gave a number for. */
   readonly thenProjected: ReadonlySet<string>;
-  /** His measured ice since the chosen day; null for a goalie or a skater with no game since. */
-  readonly usage: ScoutUsage | null;
 }
 
 export interface ScoutList {
@@ -58,17 +55,13 @@ export interface ScoutList {
   readonly inSeason: boolean;
   /** Which earlier line the then-lines are, and what answered the day asked for. */
   readonly since: ScoutSince;
-  /** N when the ice was read over each club's last N games; null when since the day. */
-  readonly recentGames: number | null;
   readonly players: readonly ScoutPlayer[];
 }
 
-/** How the page asks for a league's players: the day to compare with, and the ice's window. */
+/** How the page asks for a league's players: the day to compare with. */
 export interface ScoutQuery {
   /** The day to compare the projection with, as an ISO date, or null for the preseason line. */
   readonly since: string | null;
-  /** Read the ice over each club's last N games; null reads it since the day. */
-  readonly recentGames: number | null;
 }
 
 /**
@@ -123,7 +116,7 @@ export class PlayerScoutService {
 
   /**
    * Every player in the league the model projects, with its view of him now and on the query's
-   * day, and his ice over the query's window.
+   * day.
    */
   players(platform: LeaguePlatform, leagueId: string, query: ScoutQuery): Observable<ScoutList> {
     return from(
@@ -131,13 +124,11 @@ export class PlayerScoutService {
         platform,
         leagueId,
         since: query.since ?? undefined,
-        recentGames: query.recentGames ?? undefined,
       }),
     ).pipe(
       map((answer) => ({
         inSeason: answer.inSeason,
         since: answer.since,
-        recentGames: answer.recentGames ?? null,
         players: answer.players.map(toScoutPlayer),
       })),
     );
@@ -289,6 +280,5 @@ function toScoutPlayer(row: PlayerScoutRow): ScoutPlayer {
     injuryStatus: row.injuryStatus,
     then: row.then ? projectionOf(type, playerId, row.then) : null,
     thenProjected: new Set(row.then ? Object.keys(row.then.stats) : []),
-    usage: row.usage ?? null,
   };
 }
