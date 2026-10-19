@@ -48,6 +48,8 @@ import {
 } from './lineup-value';
 import { readStreamers, writeStreamers } from './scout-streamers';
 import {
+  ChangeKey,
+  changeSortKey,
   nextScoutSort,
   rankScout,
   SCOUT_RANKED_ORDER,
@@ -891,19 +893,23 @@ export class PlayerScoutComponent {
    */
   readonly sort = computed<ScoutSort>(() => {
     const sort = this.sortPicked();
-    const about: ScoutSortKey[] = ['name', 'score', 'games'];
+    const figures: ScoutSortKey[] = ['score', 'games', ...this.categories()];
     if (this.shown() !== 'goalies') {
-      about.push('toi');
+      figures.push('toi');
     }
+    const about: ScoutSortKey[] = ['name', ...figures];
     if (this.compare()) {
       about.push('delta', 'rise');
+      for (const figure of figures) {
+        if (figure !== 'score') {
+          about.push(changeSortKey(figure as ChangeKey));
+        }
+      }
     }
     if (this.gains() !== null) {
-      about.push('gain');
+      about.push('gain', 'scoreGain');
     }
-    return about.includes(sort.key) || this.categories().includes(sort.key as ScoringStatKey)
-      ? sort
-      : SCOUT_RANKED_ORDER;
+    return about.includes(sort.key) ? sort : SCOUT_RANKED_ORDER;
   });
 
   /** Sorts the whole list by a column, best first; the same column again turns it round. */

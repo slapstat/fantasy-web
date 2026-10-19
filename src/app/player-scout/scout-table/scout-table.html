@@ -1,36 +1,21 @@
 <div class="table-scroll">
   <table class="free-agents-table scout-table" [class.scout-table--compare]="compare()">
     <thead>
-      <!-- With a comparison on, the projection columns are named once above them, with what
-           they are compared against. The two gain
-           columns are named by the drop they are set against. -->
-      @if (compare()) {
-        <tr class="group-row">
-          <th scope="colgroup" colspan="2" class="group-col group-col--blank"></th>
-          <th scope="colgroup" [attr.colspan]="projectionSpan()" class="group-col group-col--start">
-            <span class="group-name">Projection</span>
-            <span class="group-since">{{ sinceLabel() }}</span>
-          </th>
-          @if (gaining()) {
-            <th scope="colgroup" colspan="2" class="group-col group-col--start group-col--gain">
-              <span class="group-name">vs {{ dropName() }}</span>
-            </th>
-          }
-        </tr>
-      } @else if (gaining()) {
-        <tr class="group-row group-row--gain">
-          <th
-            scope="colgroup"
-            [attr.colspan]="2 + projectionSpan()"
-            class="group-col group-col--blank"
-          ></th>
-          <th scope="colgroup" colspan="2" class="group-col group-col--start group-col--gain">
-            <span class="group-name">vs {{ dropName() }}</span>
-          </th>
-        </tr>
-      }
+      <!-- One heading row, and each heading built as its cell is: the figure's name over its
+           change. With a comparison on, the lower line of a figure's heading sorts by the change
+           since the chosen day, so the list can answer which goals, shots or rank moved most; the
+           gain columns' lower line names the drop they are set against. A row of group names
+           stood above this one for a while, and left a blank block over the frozen player column
+           on every screen; what it said now sits in the headings it was about. -->
       <tr>
-        <th scope="col" class="num rank-col" [appTooltip]="rankTip()">#</th>
+        <th scope="col" class="num rank-col" [attr.aria-sort]="compare() ? ariaSort('rise') : null">
+          <span class="heading" [appTooltip]="rankTip()">#</span>
+          @if (compare()) {
+            <ng-container
+              *ngTemplateOutlet="changeSort; context: { key: changeKey('rank'), what: 'rank' }"
+            />
+          }
+        </th>
         <th scope="col" class="player-col" [attr.aria-sort]="ariaSort('name')">
           <button type="button" class="sort" (click)="sortBy.emit('name')">
             Player
@@ -43,7 +28,7 @@
           scope="col"
           class="num score-col"
           [class.stat-col--start]="compare()"
-          [attr.aria-sort]="ariaSort('score')"
+          [attr.aria-sort]="ariaSort('score', 'delta')"
         >
           <button
             type="button"
@@ -57,20 +42,22 @@
             {{ scoreHeading() }}
           </button>
           @if (compare()) {
+            <!-- The score's change wears the word, as the one heading that teaches what the small
+                 control under every other figure is. -->
             <button
               type="button"
-              class="sort sort--delta"
+              class="sort sort--change sort--change-named"
               [class.sort--on]="sort().key === 'delta'"
+              [attr.aria-label]="changeTip(scoreHeading())"
+              [appTooltip]="changeTip(scoreHeading())"
               (click)="sortBy.emit('delta')"
             >
-              @if (sort().key === 'delta') {
-                <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
-              }
+              <app-icon [name]="changeIcon('delta')" [size]="14" />
               change
             </button>
           }
         </th>
-        <th scope="col" class="num" [attr.aria-sort]="ariaSort('games')">
+        <th scope="col" class="num" [attr.aria-sort]="ariaSort('games', changeKey('games'))">
           <button
             type="button"
             class="sort"
@@ -82,9 +69,17 @@
             }
             GP
           </button>
+          @if (compare()) {
+            <ng-container
+              *ngTemplateOutlet="
+                changeSort;
+                context: { key: changeKey('games'), what: 'games left' }
+              "
+            />
+          }
         </th>
         @if (anySkater()) {
-          <th scope="col" class="num toi-col" [attr.aria-sort]="ariaSort('toi')">
+          <th scope="col" class="num toi-col" [attr.aria-sort]="ariaSort('toi', changeKey('toi'))">
             <button
               type="button"
               class="sort"
@@ -96,10 +91,19 @@
               }
               TOI
             </button>
+            @if (compare()) {
+              <ng-container
+                *ngTemplateOutlet="changeSort; context: { key: changeKey('toi'), what: 'ice time' }"
+              />
+            }
           </th>
         }
         @for (column of columns(); track column.key) {
-          <th scope="col" class="num stat-col" [attr.aria-sort]="ariaSort(column.key)">
+          <th
+            scope="col"
+            class="num stat-col"
+            [attr.aria-sort]="ariaSort(column.key, changeKey(column.key))"
+          >
             <button
               type="button"
               class="sort"
@@ -111,13 +115,37 @@
               }
               {{ column.label }}
             </button>
+            @if (compare()) {
+              <ng-container
+                *ngTemplateOutlet="
+                  changeSort;
+                  context: { key: changeKey(column.key), what: column.name }
+                "
+              />
+            }
           </th>
         }
         @if (gaining()) {
-          <!-- His projection less the drop's orders the list as his projection does, so the
-                 column has no sort of its own: the Points heading already sorts by it. -->
-          <th scope="col" class="num score-gain-col stat-col--start" [appTooltip]="scoreGainTip()">
-            {{ scoreHeading() }}
+          <!-- His projection less the drop's orders the list as his projection does; it sorts
+               all the same, under its own key, since a heading that answers nothing reads as
+               broken. -->
+          <th
+            scope="col"
+            class="num score-gain-col stat-col--start"
+            [attr.aria-sort]="ariaSort('scoreGain')"
+          >
+            <button
+              type="button"
+              class="sort"
+              [appTooltip]="scoreGainTip()"
+              (click)="sortBy.emit('scoreGain')"
+            >
+              @if (sort().key === 'scoreGain') {
+                <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
+              }
+              {{ scoreHeading() }}
+            </button>
+            <span class="heading-sub">vs {{ dropName() }}</span>
           </th>
           <th scope="col" class="num gain-col" [attr.aria-sort]="ariaSort('gain')">
             <button
@@ -131,6 +159,7 @@
               }
               Lineup
             </button>
+            <span class="heading-sub">vs {{ dropName() }}</span>
           </th>
         }
       </tr>
@@ -268,3 +297,18 @@
     </tbody>
   </table>
 </div>
+
+<!-- The change's own sort control, under a figure's heading: an icon in rest, since "change"
+     would not fit under "G", and the arrow of the order when the list is sorted by it. -->
+<ng-template #changeSort let-key="key" let-what="what">
+  <button
+    type="button"
+    class="sort sort--change"
+    [class.sort--on]="sort().key === key"
+    [attr.aria-label]="changeTip(what)"
+    [appTooltip]="changeTip(what)"
+    (click)="sortBy.emit(key)"
+  >
+    <app-icon [name]="changeIcon(key)" [size]="14" />
+  </button>
+</ng-template>

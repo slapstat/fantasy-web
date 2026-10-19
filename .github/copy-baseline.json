@@ -1,6 +1,5 @@
 {
   "src/app/draft-mode/league-projection-table/league-projection-table.html :: —": 1,
-  "src/app/player-scout/player-scout.html :: text block over 120 characters": 1,
-  "src/app/player-scout/player-scout.html :: tooltip over 60 characters": 2,
+  "src/app/player-scout/player-scout.html :: tooltip over 60 characters": 1,
   "src/app/shared/environment-banner/environment-banner.html :: —": 1
 }
