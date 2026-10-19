@@ -1,7 +1,6 @@
 import { MockBuilder, MockRender, ngMocks } from 'ng-mocks';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PlayerPoolNoticeComponent } from './player-pool-notice';
-import { PlayerBasis } from '../../services/projection-serializer';
 
 describe('PlayerPoolNoticeComponent', () => {
   beforeEach(() => MockBuilder(PlayerPoolNoticeComponent));
@@ -19,39 +18,11 @@ describe('PlayerPoolNoticeComponent', () => {
     expect(text).toContain('Your existing projections are unchanged');
   });
 
-  describe('says what the new players start from', () => {
-    function footer(playerBasis: PlayerBasis | null): string {
-      const fixture = MockRender(PlayerPoolNoticeComponent, { newPlayerCount: 3, playerBasis });
-      return fixture.nativeElement.querySelector('.pool-notice__footer').textContent as string;
-    }
+  // What the new players start from is not said: the footer is the one reassurance.
+  it('keeps the footer to the existing projections', () => {
+    const footer = render(3).nativeElement.querySelector('.pool-notice__footer');
 
-    it("last season's stats for a projection built on them", () => {
-      expect(footer('last_season')).toContain("New players start with last season's stats.");
-      expect(footer('last_season')).not.toContain('zero');
-    });
-
-    it('zero for a projection built from scratch', () => {
-      expect(footer('blank')).toContain('New players start at zero.');
-    });
-
-    // The model has no numbers for a player without an NHL season, so not every newcomer is its.
-    it("the AI projection, with last season's stats where it has none", () => {
-      expect(footer('model')).toContain(
-        "New players start with the AI projection, or last season's stats if it has no numbers for them.",
-      );
-    });
-
-    it("the rest of the season, with last season's stats where it has none", () => {
-      expect(footer('rest_of_season')).toContain(
-        'New players start with the AI projection for the rest of the season',
-      );
-    });
-
-    it('both starting points when the basis is not known', () => {
-      expect(footer(null)).toContain(
-        "last season's stats, or zero for projections built from scratch",
-      );
-    });
+    expect(footer.textContent.trim()).toBe('Your existing projections are unchanged.');
   });
 
   it('reads as one player for a single addition', () => {

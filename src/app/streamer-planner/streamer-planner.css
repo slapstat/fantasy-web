@@ -99,9 +99,63 @@
   color: var(--color-primary-contrast);
 }
 
-/* The positions, skaters' and the goalies', under the card's title. */
-.positions {
+/* The positions, skaters' and the goalies', under the card's title, with the name search across
+   from them; on a narrow screen the search drops under the pills at full width. */
+.list-tools {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  justify-content: space-between;
   margin-bottom: var(--space-3);
+}
+
+.search-field {
+  display: block;
+  flex: 0 1 15rem;
+  min-width: 12rem;
+  position: relative;
+}
+
+.search-icon {
+  color: var(--color-text-subtle);
+  display: inline-flex;
+  left: 0.7rem;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.search-input {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  min-height: 2rem;
+  padding: 0.3rem 0.75rem 0.3rem 2.1rem;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+  width: 100%;
+}
+
+.search-input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.search-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(30, 107, 255, 0.15);
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .search-field {
+    flex-basis: 100%;
+  }
 }
 
 /* The categories the free agents are ranked by: under the positions, since they change the order
