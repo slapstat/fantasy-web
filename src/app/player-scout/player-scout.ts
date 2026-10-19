@@ -14,6 +14,7 @@ import { nhlTeamKey } from '../models/nhl-team';
 import { Projection, ScoredProjection } from '../models/projection.model';
 import { isAllSkaters } from '../models/position.model';
 import { ScoringStatKey } from '../models/stat-key.model';
+import { STAT_FULL_NAMES } from '../pipes/stat-tooltip.pipe';
 import { EspnService } from '../services/espn.service';
 import { ChosenLeague, LeagueChoiceService } from '../services/league-choice.service';
 import { PlayerScoutService, ScoutSince, TeamPlayer } from '../services/player-scout.service';
@@ -49,9 +50,11 @@ import {
 import { readStreamers, writeStreamers } from './scout-streamers';
 import {
   ChangeKey,
+  changeOf,
   changeSortKey,
   nextScoutSort,
   rankScout,
+  SCOUT_MOVERS_ORDER,
   SCOUT_RANKED_ORDER,
   ScoutRow,
   ScoutSort,
@@ -63,8 +66,8 @@ import {
   formatDay,
   localToday,
   sinceCaption,
-  SincePickerComponent,
-} from './since-picker/since-picker';
+  CompareMenuComponent,
+} from './compare-menu/compare-menu';
 
 /** Players to a page: enough to reach well past a league's bench without a second page. */
 export const SCOUT_PAGE_SIZE = 25;
@@ -140,7 +143,7 @@ export interface LeagueTeamOption {
     NgTemplateOutlet,
     PositionChipsComponent,
     ScoutTableComponent,
-    SincePickerComponent,
+    CompareMenuComponent,
     TeamLogoComponent,
     TooltipDirective,
   ],
@@ -200,13 +203,29 @@ export class PlayerScoutComponent {
   readonly since = signal<string | null>(null);
 
   toggleCompare(): void {
-    this.compare.update((on) => !on);
+    if (this.compare()) {
+      this.clearCompare();
+    } else {
+      this.switchOn();
+    }
   }
 
   /** The preseason (null) or a day picked: the comparison on, against that. */
   pickSince(day: string | null): void {
     this.since.set(day);
-    this.compare.set(true);
+    this.switchOn();
+  }
+
+  /**
+   * The comparison on, and the list in the order the comparison is for: the players the model
+   * makes the most more of since the day. Off again, the ranked order comes back of itself
+   * ({@link sort}), unless the reader has sorted by something else since.
+   */
+  private switchOn(): void {
+    if (!this.compare()) {
+      this.compare.set(true);
+      this.sortPicked.set(SCOUT_MOVERS_ORDER);
+    }
   }
 
   /** Off: today's projection alone. The day is kept, so Off and back lands on the same one. */
@@ -356,6 +375,11 @@ export class PlayerScoutComponent {
   readonly nhlTeam = signal<string | null>(null);
   readonly movers = signal<ScoutMovers>('all');
   readonly search = signal('');
+
+  /** Risers or Fallers pressed: that way only, or, pressed again, everyone. */
+  toggleMovers(which: Exclude<ScoutMovers, 'all'>): void {
+    this.movers.update((movers) => (movers === which ? 'all' : which));
+  }
 
   onPool(event: Event): void {
     this.pool.set((event.target as HTMLSelectElement).value as ScoutPool);
@@ -993,6 +1017,37 @@ export class PlayerScoutComponent {
     const last = first + this.visible().length - 1;
     return first === last ? `${first} of ${total}` : `${first}–${last} of ${total}`;
   });
+
+  /**
+   * Which change the list is sorted by, beside its count, since a change's heading is a small
+   * control and the day it is against is on the button: "Sorted by the change in Points vs 15
+   * Oct". Empty in any other order, which the headings say for themselves.
+   */
+  readonly orderText = computed(() => {
+    if (!this.compare()) {
+      return '';
+    }
+    const what = this.changeName(this.sort().key);
+    return what ? `Sorted by the change in ${what} ${this.sinceLabel()}` : '';
+  });
+
+  /** The figure a change key is the change of, as the order note names it; empty for any other key. */
+  private changeName(key: ScoutSortKey): string {
+    if (key === 'delta') {
+      return this.scoreHeading();
+    }
+    if (key === 'rise') {
+      return 'rank';
+    }
+    const figure = changeOf(key);
+    if (figure === 'games') {
+      return 'Games';
+    }
+    if (figure === 'toi') {
+      return 'Ice time';
+    }
+    return figure === null ? '' : STAT_FULL_NAMES[figure];
+  }
 
   goToPage(page: number): void {
     this.page.set(Math.max(0, Math.min(page, this.pageCount() - 1)));

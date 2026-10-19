@@ -382,54 +382,42 @@
         </ng-template>
       }
 
-      <!-- The comparison, on a band on the table itself, so the setting sits with the columns it
-           changes. The band stays through a reload, so changing the day does not take the control
-           away. -->
+      <!-- The comparison, on the table's top line, so the setting sits with the columns it
+           changes. The line stays through a reload, so changing the day does not take the control
+           away. One button that reads as a sentence; with a comparison on, the two ways the
+           projection moved beside it, either one pressed or neither. -->
       <div class="list">
-        <div class="viewbar">
-          <!-- The comparison: off, the list is today's projection and nothing else. -->
-          <div class="setting">
-            <span class="field-label">Compare with</span>
-            <app-since-picker
-              [on]="compare()"
-              [since]="since()"
-              [today]="today"
-              [earliestKept]="earliestKept()"
-              (sinceChange)="pickSince($event)"
-              (cleared)="clearCompare()"
-            />
-          </div>
+        <div class="compare-line">
+          <app-compare-menu
+            [on]="compare()"
+            [since]="since()"
+            [today]="today"
+            [earliestKept]="earliestKept()"
+            (sinceChange)="pickSince($event)"
+            (cleared)="clearCompare()"
+          />
           @if (compare()) {
-            <div class="setting">
-              <span class="field-label">Moved</span>
-              <div class="segmented" role="group" aria-label="Which way the projection moved">
-                <button
-                  type="button"
-                  [class.active]="movers() === 'all'"
-                  [attr.aria-pressed]="movers() === 'all'"
-                  (click)="movers.set('all')"
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  class="movers--risers"
-                  [class.active]="movers() === 'risers'"
-                  [attr.aria-pressed]="movers() === 'risers'"
-                  (click)="movers.set('risers')"
-                >
-                  Risers
-                </button>
-                <button
-                  type="button"
-                  class="movers--fallers"
-                  [class.active]="movers() === 'fallers'"
-                  [attr.aria-pressed]="movers() === 'fallers'"
-                  (click)="movers.set('fallers')"
-                >
-                  Fallers
-                </button>
-              </div>
+            <div class="movers" role="group" aria-label="Which way the projection moved">
+              <button
+                type="button"
+                class="mover mover--risers"
+                [class.mover--on]="movers() === 'risers'"
+                [attr.aria-pressed]="movers() === 'risers'"
+                (click)="toggleMovers('risers')"
+              >
+                <app-icon name="arrow-up" [size]="14" />
+                Risers
+              </button>
+              <button
+                type="button"
+                class="mover mover--fallers"
+                [class.mover--on]="movers() === 'fallers'"
+                [attr.aria-pressed]="movers() === 'fallers'"
+                (click)="toggleMovers('fallers')"
+              >
+                <app-icon name="arrow-down" [size]="14" />
+                Fallers
+              </button>
             </div>
             @if (sinceCaption(); as caption) {
               <p class="caption" aria-live="polite">{{ caption }}</p>
@@ -469,7 +457,12 @@
             (sortBy)="sortBy($event)"
           />
           <div class="list-foot">
-            <span class="list-count" aria-live="polite">{{ rangeText() }}</span>
+            <span class="list-count" aria-live="polite">
+              {{ rangeText() }}
+              @if (orderText(); as order) {
+                <span class="list-order">{{ order }}</span>
+              }
+            </span>
             @if (pageCount() > 1) {
               <nav class="pager" aria-label="Pages of players">
                 <button
