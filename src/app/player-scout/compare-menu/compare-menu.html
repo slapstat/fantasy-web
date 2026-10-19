@@ -1,0 +1,56 @@
+<!-- The button is the control: white in rest, navy with the day on it once a comparison is on.
+     The platform's date field hides under it, so the picker "Pick a day" opens is anchored
+     here; the field is the picker's vehicle, not a stop of its own. -->
+<button
+  #menu="appPopover"
+  type="button"
+  class="compare-btn"
+  [class.compare-btn--on]="on()"
+  [appPopover]="compareMenu"
+  popoverAlign="start"
+>
+  @if (short(); as face) {
+    <span class="compare-value">{{ face }}</span>
+  } @else {
+    <span class="compare-lead">Compare with · </span>
+    <span class="compare-value">{{ value() }}</span>
+  }
+  <app-icon class="chevron" name="chevron-down" [size]="14" />
+</button>
+<input
+  #field
+  class="day-field"
+  type="date"
+  tabindex="-1"
+  aria-hidden="true"
+  [min]="earliest()"
+  [max]="latest()"
+  [value]="since() ?? ''"
+  (change)="onDate($event)"
+/>
+
+<ng-template #compareMenu>
+  <div class="menu" role="radiogroup" aria-labelledby="compare-menu-title">
+    <p id="compare-menu-title" class="menu-title">Compare today's projection with</p>
+    @for (choice of choices(); track choice.key) {
+      <button
+        type="button"
+        class="choice"
+        role="radio"
+        [attr.aria-checked]="choice.picked"
+        [disabled]="!choice.kept"
+        (click)="pick(choice, menu)"
+      >
+        <span class="dot"></span>
+        <span class="choice-label">{{ choice.label }}</span>
+        <span class="choice-note">{{ choice.note }}</span>
+      </button>
+    }
+    <div class="divider" role="presentation"></div>
+    <button type="button" class="pick-day" [disabled]="noDayYet()" (click)="pickDay(menu)">
+      <app-icon name="calendar-days" [size]="16" />
+      Pick a day
+    </button>
+    <p class="menu-foot">{{ footer() }}</p>
+  </div>
+</ng-template>

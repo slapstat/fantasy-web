@@ -22,7 +22,7 @@ import { ErrorStateComponent } from '../shared/error-state/error-state';
 import { YahooLeaguePicker } from '../shared/yahoo-league-picker';
 import { PlayerScoutComponent, SCOUT_PAGE_SIZE, surname } from './player-scout';
 import { ScoutTableComponent } from './scout-table/scout-table';
-import { SincePickerComponent } from './since-picker/since-picker';
+import { CompareMenuComponent } from './compare-menu/compare-menu';
 
 const LEAGUE: ChosenLeague = { platform: 'YAHOO', leagueId: '465.l.9', name: 'The Gordie Howes' };
 
@@ -257,9 +257,9 @@ describe('PlayerScoutComponent', () => {
     expect(ids(page.filtered())).not.toContain('301');
     const table = ngMocks.find(fixture, ScoutTableComponent);
     expect(ngMocks.input(table, 'compare')).toBe(false);
-    expect(ngMocks.input(ngMocks.find(fixture, SincePickerComponent), 'on')).toBe(false);
+    expect(ngMocks.input(ngMocks.find(fixture, CompareMenuComponent), 'on')).toBe(false);
     // The floor of the day picker is known before any comparison is on.
-    expect(ngMocks.input(ngMocks.find(fixture, SincePickerComponent), 'earliestKept')).toBe(
+    expect(ngMocks.input(ngMocks.find(fixture, CompareMenuComponent), 'earliestKept')).toBe(
       '2026-10-08',
     );
     expect(page.sinceAnswer()).toBeNull();
@@ -293,7 +293,7 @@ describe('PlayerScoutComponent', () => {
     fixture.detectChanges();
 
     expect(players).toHaveBeenCalledTimes(1);
-    expect(ngMocks.input(ngMocks.find(fixture, SincePickerComponent), 'on')).toBe(true);
+    expect(ngMocks.input(ngMocks.find(fixture, CompareMenuComponent), 'on')).toBe(true);
     // The day asked for answered, so the caption has nothing to add to the label.
     expect(page.sinceCaption()).toEqual('');
     expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'compare')).toBe(true);
@@ -321,6 +321,69 @@ describe('PlayerScoutComponent', () => {
     page.pool.set('all');
     page.movers.set('fallers');
     expect(ids(page.filtered())).toEqual(['301']);
+  });
+
+  it('presses Risers or Fallers as a chip: that way only, and everyone again on the second press', async () => {
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    page.pool.set('all');
+    page.toggleCompare();
+    fixture.detectChanges();
+
+    const chip = (name: string) =>
+      ngMocks.findAll(fixture, '.mover').find((el) => ngMocks.formatText(el) === name)!;
+    expect(chip('Risers').attributes['aria-pressed']).toBe('false');
+    ngMocks.click(chip('Risers'));
+    fixture.detectChanges();
+    expect(page.movers()).toBe('risers');
+    expect(chip('Risers').attributes['aria-pressed']).toBe('true');
+    expect(chip('Fallers').attributes['aria-pressed']).toBe('false');
+
+    ngMocks.click(chip('Fallers'));
+    expect(page.movers()).toBe('fallers');
+    ngMocks.click(chip('Fallers'));
+    expect(page.movers()).toBe('all');
+
+    page.clearCompare();
+    fixture.detectChanges();
+    expect(ngMocks.findAll(fixture, '.mover')).toHaveLength(0);
+  });
+
+  it('sorts by the change in score when the comparison comes on, says so by the count, and goes back to ranked when it goes off', async () => {
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    expect(page.orderText()).toBe('');
+
+    page.pickSince('2026-10-07');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(page.sort()).toEqual({ key: 'delta', descending: true });
+    expect(ids(page.sorted())[0]).toBe('99');
+    expect(page.orderText()).toBe('Sorted by the change in Points vs 7 Oct');
+    expect(ngMocks.formatText(ngMocks.find(fixture, '.list-count'))).toContain(
+      'Sorted by the change in Points vs 7 Oct',
+    );
+
+    // Another day keeps the order; off brings the ranked order back.
+    page.pickSince('2026-10-05');
+    expect(page.sort()).toEqual({ key: 'delta', descending: true });
+    page.clearCompare();
+    expect(page.sort()).toEqual({ key: 'score', descending: true });
+    expect(page.orderText()).toBe('');
+
+    // A column of the reader's own survives off, and on again is the change once more.
+    page.pickSince(null);
+    await fixture.whenStable();
+    page.sortBy('change:goals');
+    expect(page.orderText()).toBe('Sorted by the change in Goals vs 7 Oct');
+    page.sortBy('rise');
+    expect(page.orderText()).toBe('Sorted by the change in Rank vs 7 Oct');
+    page.sortBy('games');
+    page.clearCompare();
+    expect(page.sort()).toEqual({ key: 'games', descending: true });
+    page.pickSince(null);
+    expect(page.sort()).toEqual({ key: 'delta', descending: true });
   });
 
   it("shows free agents, waivers, taken players, everyone, or one team's roster", async () => {
@@ -918,6 +981,9 @@ describe('PlayerScoutComponent', () => {
 
     expect(page.sinceLabel()).toBe('no earlier projection');
     expect(page.sinceCaption()).toEqual('No earlier projection to compare with yet.');
+    // The list is sorted by the change, but there is no day to say it is against.
+    expect(page.sort()).toEqual({ key: 'delta', descending: true });
+    expect(page.orderText()).toBe('');
   });
 
   it('switches the comparison on with the day picked, and off with the day kept', async () => {
@@ -937,7 +1003,7 @@ describe('PlayerScoutComponent', () => {
     expect(page.compare()).toBe(false);
     expect(page.since()).toBe('2026-10-05');
     expect(query(players.mock.lastCall!)).toEqual({ since: null });
-    expect(ngMocks.input(ngMocks.find(fixture, SincePickerComponent), 'since')).toBe('2026-10-05');
+    expect(ngMocks.input(ngMocks.find(fixture, CompareMenuComponent), 'since')).toBe('2026-10-05');
   });
 
   it('keeps the comparison band on the list through a reload, and the room line off until it is back', async () => {
@@ -953,7 +1019,7 @@ describe('PlayerScoutComponent', () => {
 
     expect(page.loading()).toBe(true);
     expect(page.listReady()).toBe(false);
-    expect(ngMocks.findAll(fixture, '.viewbar')).toHaveLength(1);
+    expect(ngMocks.findAll(fixture, '.compare-line')).toHaveLength(1);
     expect(ngMocks.findAll(fixture, '.room-box')).toHaveLength(0);
   });
 
