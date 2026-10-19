@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { Projection, ScoredProjection } from '../models/projection.model';
 import { ScoutPlayer } from '../services/player-scout.service';
 import {
+  changeOf,
+  changeSortKey,
+  changeValue,
   isRising,
   nextScoutSort,
   rankScout,
@@ -222,6 +225,72 @@ describe('sorting the scout list', () => {
     expect(ids(sortScout(rows, { key: 'gain', descending: true }))).toEqual(['1', '2', '3', '4']);
   });
 
+  it("sorts by a figure's change since the day, the biggest first, a player with no then-line last", () => {
+    // Points went 30 (none), 20 from 10, 10 from 30, 5 from 40: up 10, down 20, down 35.
+    expect(rows.map((row) => changeValue(row, 'points'))).toEqual([null, 10, -20, -35]);
+    expect(ids(sortScout(rows, { key: 'change:points', descending: true }))).toEqual([
+      '2',
+      '3',
+      '4',
+      '1',
+    ]);
+    expect(ids(sortScout(rows, { key: 'change:points', descending: false }))).toEqual([
+      '4',
+      '3',
+      '2',
+      '1',
+    ]);
+  });
+
+  it("reads a figure's change as the cell writes it: games, ice time, and fewer goals against as a gain", () => {
+    const [skater] = rankScout(
+      [player(skaterLine(1, 30, 72, 1100), skaterLine(1, 30, 70, 1000))],
+      byValue,
+      fantasyPoints,
+    );
+    expect(changeValue(skater, 'games')).toEqual(2);
+    expect(changeValue(skater, 'toi')).toEqual(100);
+    // A category the day's line was not projected in says nothing.
+    expect(changeValue(skater, 'hits')).toBeNull();
+
+    const goalieWith = (ga: number): Projection => ({
+      type: 'goalie',
+      playerId: 2,
+      stats: { scoring: { w: 20, ga } as never, utility: { gp: 40 } },
+    });
+    const [goalie] = rankScout(
+      [player(goalieWith(120), goalieWith(130), { thenProjected: new Set(['w', 'ga']) })],
+      byValue,
+      fantasyPoints,
+    );
+    // Ten goals fewer against is a change for the better: positive, so it sorts as a gain.
+    expect(changeValue(goalie, 'ga')).toEqual(10);
+    expect(changeValue(goalie, 'toi')).toBeNull();
+  });
+
+  it("sorts by his projection less the drop's as by his projection, under its own key", () => {
+    expect(ids(sortScout(rows, { key: 'scoreGain', descending: true }))).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+    ]);
+    expect(ids(sortScout(rows, { key: 'scoreGain', descending: false }))).toEqual([
+      '4',
+      '3',
+      '2',
+      '1',
+    ]);
+  });
+
+  it('names the figure a change key is the change of', () => {
+    expect(changeSortKey('goals')).toEqual('change:goals');
+    expect(changeOf('change:goals')).toEqual('goals');
+    expect(changeOf('change:toi')).toEqual('toi');
+    expect(changeOf('goals')).toBeNull();
+    expect(changeOf('delta')).toBeNull();
+  });
+
   it('sorts the other columns as the planner does', () => {
     expect(ids(sortScout(rows, { key: 'score', descending: false }))).toEqual(['4', '3', '2', '1']);
     expect(ids(sortScout(rows, { key: 'name', descending: true }))).toEqual(['4', '3', '2', '1']);
@@ -233,6 +302,12 @@ describe('sorting the scout list', () => {
     expect(nextScoutSort(rise, 'rise')).toEqual({ key: 'rise', descending: false });
     expect(nextScoutSort(rise, 'delta')).toEqual({ key: 'delta', descending: true });
     expect(nextScoutSort(rise, 'gain')).toEqual({ key: 'gain', descending: true });
+    expect(nextScoutSort(rise, 'scoreGain')).toEqual({ key: 'scoreGain', descending: true });
+    expect(nextScoutSort(rise, 'change:sog')).toEqual({ key: 'change:sog', descending: true });
+    expect(nextScoutSort({ key: 'change:sog', descending: true }, 'change:sog')).toEqual({
+      key: 'change:sog',
+      descending: false,
+    });
   });
 
   it('opens every other column best first, from the rise too', () => {

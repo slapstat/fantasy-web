@@ -1,5 +1,6 @@
 import { Projection, ScoredProjection } from '../models/projection.model';
 import { compareStatValues } from '../models/sorting';
+import { LOWER_IS_BETTER_SCORING_STAT_KEYS, ScoringStatKey } from '../models/stat-key.model';
 import { ScoutPlayer } from '../services/player-scout.service';
 import {
   FreeAgentSort,
@@ -124,10 +125,21 @@ export function statOf(line: Projection | null, key: string): number | null {
 // --- Sorting the list ----------------------------------------------------------------------------
 
 /**
- * A column the list can be sorted by: the planner's, the change in score, the places gained, and
- * what the lineup gains by a pickup against the chosen drop.
+ * A figure whose change since the chosen day the list can be sorted by: the games left, the ice
+ * time a game, or a category of the line. The score's change is {@link ScoutSortKey} `delta`.
  */
-export type ScoutSortKey = FreeAgentSortKey | 'delta' | 'rise' | 'gain';
+export type ChangeKey = 'games' | 'toi' | ScoringStatKey;
+
+/** The sort key of a figure's change: `change:goals`. */
+export type ChangeSortKey = `change:${ChangeKey}`;
+
+/**
+ * A column the list can be sorted by: the planner's; the change in score, the places gained and
+ * the change in any other figure since the chosen day; and, against the chosen drop, his
+ * projection less the drop's and what the lineup gains by him.
+ */
+export type ScoutSortKey =
+  FreeAgentSortKey | 'delta' | 'rise' | 'gain' | 'scoreGain' | ChangeSortKey;
 
 export interface ScoutSort {
   readonly key: ScoutSortKey;
@@ -140,21 +152,71 @@ export const SCOUT_RANKED_ORDER: ScoutSort = RANKED_ORDER;
 /** The order the page opens in: the players the model makes the most more of since the day. */
 export const SCOUT_MOVERS_ORDER: ScoutSort = { key: 'delta', descending: true };
 
-const SCOUT_OWN_KEYS: readonly ScoutSortKey[] = ['delta', 'rise', 'gain'];
+export function changeSortKey(key: ChangeKey): ChangeSortKey {
+  return `change:${key}`;
+}
+
+/** The figure a change key is the change of, or null for any other key. */
+export function changeOf(key: ScoutSortKey): ChangeKey | null {
+  return key.startsWith('change:') ? (key.slice('change:'.length) as ChangeKey) : null;
+}
+
+/** Whether the key is one of the scout's own, which the planner's sort knows nothing of. */
+function isScoutKey(key: ScoutSortKey): key is Exclude<ScoutSortKey, FreeAgentSortKey> {
+  return (
+    key === 'delta' ||
+    key === 'rise' ||
+    key === 'gain' ||
+    key === 'scoreGain' ||
+    changeOf(key) !== null
+  );
+}
 
 /**
- * Sorts by a column, best first, whichever end of the scale that is: the furthest risen first, and
- * every other column as the planner sorts it. The same column again turns the order round.
+ * Sorts by a column, best first, whichever end of the scale that is: the furthest risen first,
+ * the biggest change for the better first, and every other column as the planner sorts it. The
+ * same column again turns the order round.
  */
 export function nextScoutSort(current: ScoutSort, key: ScoutSortKey): ScoutSort {
   if (current.key === key) {
     return { key, descending: !current.descending };
   }
-  if (SCOUT_OWN_KEYS.includes(key)) {
+  if (isScoutKey(key)) {
     return { key, descending: true };
   }
   // Another column than the current: the planner reads nothing of the current order but its key.
-  return nextSort(current as FreeAgentSort, key as FreeAgentSortKey);
+  return nextSort(current as FreeAgentSort, key);
+}
+
+/**
+ * The change in a figure since the chosen day, as the cell under it writes it, with its sense:
+ * positive is the better way, so fewer goals against sorts as a gain. Null without a then-line,
+ * or where the day's line had no such figure.
+ */
+export function changeValue(row: ScoutRow, key: ChangeKey): number | null {
+  if (!row.then) {
+    return null;
+  }
+  switch (key) {
+    case 'games':
+      return row.games - Math.round(row.then.stats.utility.gp);
+    case 'toi': {
+      const now = toiPerGame(row.line);
+      const then = toiPerGame(row.then);
+      return now === undefined || then === undefined ? null : now - then;
+    }
+    default: {
+      if (!row.scout.thenProjected.has(key)) {
+        return null;
+      }
+      const now = statOf(row.line, key);
+      const then = statOf(row.then, key);
+      if (now === null || then === null) {
+        return null;
+      }
+      return LOWER_IS_BETTER_SCORING_STAT_KEYS.has(key) ? then - now : now - then;
+    }
+  }
 }
 
 /** The number a row sorts by in one of the scout's own columns; null where it says nothing. */
@@ -170,6 +232,13 @@ function scoutSortValue(
       return row.rise;
     case 'gain':
       return gains.get(row.player.playerId) ?? null;
+    // His projection less the drop's: the drop's is the same for every row, so the column orders
+    // the list exactly as the score does. It sorts under its own key so that only its heading
+    // wears the arrow.
+    case 'scoreGain':
+      return row.score;
+    default:
+      return changeValue(row, changeOf(key) as ChangeKey);
   }
 }
 
@@ -186,14 +255,13 @@ export function sortScout(
   gains: ReadonlyMap<string, number | null> = new Map(),
 ): readonly ScoutRow[] {
   const { key } = sort;
-  if (!SCOUT_OWN_KEYS.includes(key)) {
-    return sortFreeAgents(rows, { key: key as FreeAgentSortKey, descending: sort.descending });
+  if (!isScoutKey(key)) {
+    return sortFreeAgents(rows, { key, descending: sort.descending });
   }
-  const own = key as Exclude<ScoutSortKey, FreeAgentSortKey>;
   const sign = sort.descending ? -1 : 1;
   return [...rows].sort(
     (a, b) =>
-      compareStatValues(scoutSortValue(a, own, gains), scoutSortValue(b, own, gains), sign) ||
+      compareStatValues(scoutSortValue(a, key, gains), scoutSortValue(b, key, gains), sign) ||
       a.rank - b.rank,
   );
 }

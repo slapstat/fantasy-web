@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DEFAULT_DECIMAL_SETTINGS } from '../../draft-projection/projection-settings-section/model';
 import { ScoringType } from '../../models/projection.model';
@@ -20,6 +21,8 @@ import {
   NO_RATE,
 } from '../../streamer-planner/planner-free-agents';
 import {
+  ChangeKey,
+  changeSortKey,
   SCOUT_RANKED_ORDER,
   ScoutRow,
   ScoutSort,
@@ -55,7 +58,13 @@ export const TOP_GAINS = 3;
  */
 @Component({
   selector: 'app-scout-table',
-  imports: [IconComponent, PositionChipsComponent, TeamLogoComponent, TooltipDirective],
+  imports: [
+    IconComponent,
+    NgTemplateOutlet,
+    PositionChipsComponent,
+    TeamLogoComponent,
+    TooltipDirective,
+  ],
   templateUrl: './scout-table.html',
   styleUrls: [
     '../../streamer-planner/free-agents-table/free-agents-table.css',
@@ -166,12 +175,47 @@ export class ScoutTableComponent {
       : 'Projected Z-Score for the rest of the season. Zero is the last player a league this size would roster.',
   );
 
-  ariaSort(key: ScoutSortKey): 'ascending' | 'descending' | null {
+  /**
+   * Which way a column is sorted, for its heading: by the figure, or, with a comparison on, by the
+   * figure's change, which is the same column read the other way.
+   */
+  ariaSort(key: ScoutSortKey, change?: ScoutSortKey): 'ascending' | 'descending' | null {
     const sort = this.sort();
-    if (sort.key !== key) {
+    if (sort.key !== key && sort.key !== change) {
       return null;
     }
     return sort.descending ? 'descending' : 'ascending';
+  }
+
+  // --- The change's own heading -----------------------------------------------------------------
+
+  /** The key a figure's change sorts under: the score's is `delta`, every other's `change:<figure>`. */
+  changeKey(figure: ChangeKey | 'score' | 'rank'): ScoutSortKey {
+    switch (figure) {
+      case 'score':
+        return 'delta';
+      case 'rank':
+        return 'rise';
+      default:
+        return changeSortKey(figure);
+    }
+  }
+
+  /** The change control's face: the way the list is sorted when it is by this change, else both ways. */
+  changeIcon(key: ScoutSortKey): 'arrow-down' | 'arrow-up' | 'arrow-up-down' {
+    const sort = this.sort();
+    if (sort.key !== key) {
+      return 'arrow-up-down';
+    }
+    return sort.descending ? 'arrow-down' : 'arrow-up';
+  }
+
+  /**
+   * What a change's sort control stands for, said in full since the control is an icon: "Sort by
+   * the change in goals vs 7 Oct". The rank's is the places moved.
+   */
+  changeTip(what: string): string {
+    return `Sort by the change in ${what} ${this.sinceLabel()}`;
   }
 
   private scoreDigits(): number {
@@ -351,11 +395,16 @@ export class ScoutTableComponent {
   }
 }
 
-/** A change written with its sign to so many decimals, flat when it rounds to nothing. */
+/**
+ * A change written with its sign to so many decimals. One that rounds to nothing is written as
+ * nothing: five days into a comparison most figures have not moved, and a "±0.0" under each of
+ * them filled the table with marks that said so (Alexander, 2026-10-20). The cell keeps its
+ * second line, blank, so the rows stay one height.
+ */
 function signed(change: number, digits: number): Delta {
   const text = change.toFixed(digits);
   if (Number(text) === 0) {
-    return { text: `±${(0).toFixed(digits)}`, dir: 'flat' };
+    return { text: '', dir: 'flat' };
   }
   return { text: change > 0 ? `+${text}` : text, dir: change > 0 ? 'up' : 'down' };
 }
@@ -390,10 +439,10 @@ function formatIce(seconds: number): string {
   return `${seconds < 0 ? '-' : ''}${minutes}:${rest}`;
 }
 
-/** A change in ice, signed: "+6:00", "-1:30"; "±0:00" for none. */
+/** A change in ice, signed: "+6:00", "-1:30"; nothing for none, as {@link signed} writes it. */
 function formatIceChange(seconds: number): string {
   if (Math.round(seconds) === 0) {
-    return '±0:00';
+    return '';
   }
   return seconds > 0 ? `+${formatIce(seconds)}` : formatIce(seconds);
 }

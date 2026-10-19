@@ -432,6 +432,8 @@ describe('PlayerScoutComponent', () => {
     // A change without a comparison sorts by blanks: ranked instead.
     page.sortBy('delta');
     expect(page.sort()).toEqual({ key: 'score', descending: true });
+    page.sortBy('change:goals');
+    expect(page.sort()).toEqual({ key: 'score', descending: true });
     page.toggleCompare();
     page.sortBy('rise');
     expect(page.sort().key).toBe('rise');
