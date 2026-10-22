@@ -383,19 +383,57 @@ describe('projectedStarts', () => {
     expect(starts.get('backup')).toBe(0);
   });
 
-  it('splits a week the way it is likeliest to go, not every night to the starter', () => {
+  it('splits a week by the starts each is expected to make, not every night to the starter', () => {
     const shares = (share: number) => WEEK.map(() => share);
     const week = crease(WEEK, [
       ['starter', shares(0.7)],
       ['backup', shares(0.3)],
     ]);
 
-    // Over four nights at seventy-thirty the backup's likeliest week is one start.
+    // Over four nights at seventy-thirty the backup is expected to make 1.2 starts.
     const four = projectedStarts([week], all(WEEK), true);
     expect([four.get('starter'), four.get('backup')]).toEqual([3, 1]);
-    // Over two it is none: both to the starter happens more often than a split.
+    // Over two, 1.4 and 0.6: one each.
     const two = projectedStarts([week], all(WEEK.slice(2)), false);
-    expect([two.get('starter'), two.get('backup')]).toEqual([2, 0]);
+    expect([two.get('starter'), two.get('backup')]).toEqual([1, 1]);
+  });
+
+  it('gives the backup his start when the rest of the crease is spread over two of them', () => {
+    // Edmonton's 22 and 24 October 2026: Jarry is expected to make 1.14 starts, Levi 0.47 and
+    // Tomkins 0.39. Both to Jarry is the single likeliest split, but it is not what he is expected
+    // to make.
+    const nights = WEEK.slice(2);
+    const starts = projectedStarts(
+      [
+        crease(nights, [
+          ['jarry', [0.571, 0.571]],
+          ['levi', [0.235, 0.235]],
+          ['tomkins', [0.194, 0.194]],
+        ]),
+      ],
+      all(nights),
+      false,
+    );
+
+    expect([starts.get('jarry'), starts.get('levi'), starts.get('tomkins')]).toEqual([1, 1, 0]);
+  });
+
+  it('gives a crease of three even thirds one start each over three nights', () => {
+    const nights = WEEK.slice(1);
+    const third = nights.map(() => 1 / 3);
+    const starts = projectedStarts(
+      [
+        crease(nights, [
+          ['a', third],
+          ['b', third],
+          ['c', third],
+        ]),
+      ],
+      all(nights),
+      false,
+    );
+
+    expect([starts.get('a'), starts.get('b'), starts.get('c')]).toEqual([1, 1, 1]);
   });
 
   it("reads each night's own shares, so a starter back from injury takes the nights after", () => {
