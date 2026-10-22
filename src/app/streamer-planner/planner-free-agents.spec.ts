@@ -418,6 +418,26 @@ describe('projectedStarts', () => {
     expect([starts.get('jarry'), starts.get('levi'), starts.get('tomkins')]).toEqual([1, 1, 0]);
   });
 
+  it('leaves a game of a long stretch to a goalie the model does not name when his share adds up to it', () => {
+    // Fifteen nights at 0.60 and 0.35: 9, 5.25, and 0.75 left to nobody named.
+    const nights = Array.from(
+      { length: 15 },
+      (_, day) => `2026-11-${String(day + 1).padStart(2, '0')}`,
+    );
+    const starts = projectedStarts(
+      [
+        crease(nights, [
+          ['starter', nights.map(() => 0.6)],
+          ['backup', nights.map(() => 0.35)],
+        ]),
+      ],
+      all(nights),
+      false,
+    );
+
+    expect([starts.get('starter'), starts.get('backup')]).toEqual([9, 5]);
+  });
+
   it('gives a crease of three even thirds one start each over three nights', () => {
     const nights = WEEK.slice(1);
     const third = nights.map(() => 1 / 3);
