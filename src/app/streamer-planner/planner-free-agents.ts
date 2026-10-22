@@ -352,10 +352,13 @@ export function scaledProjection(projection: Projection, share: LineShare): Proj
  * The model's crease is a chance a night (a starter at 0.7, his backup at 0.3), and a game is
  * started by one man, not a share of it by each. Scaled player by player, New Jersey's one game
  * of a weekend left both its free agents at about half a start: each read "0" games and still
- * carried a line. So a club's counted games are given out together, as the split of them likeliest
- * to happen: one game goes to the likeliest starter, and four at seventy-thirty go three and one,
- * which is what a week of them looks like, rather than four and none. The goalies a league has
- * rostered are in the crease as well, so a free agent behind one of them is given none.
+ * carried a line. So a club's counted games are given out together, its expected starts rounded
+ * to whole games that add up to them: one game goes to the likeliest starter, and four at
+ * seventy-thirty go three and one. The single likeliest split of the nights was used before, and
+ * it favoured the starter wherever the rest of a night was spread over several backups: Edmonton's
+ * 0.57 starter took both of two nights beside a 0.24 and a 0.19, two starts against an expected
+ * 1.14. The goalies a league has rostered are in the crease as well, so a free agent behind one of
+ * them is given none.
  *
  * Keyed by the platform's player id; a goalie in no crease is not in it.
  */
@@ -366,7 +369,7 @@ export function projectedStarts(
 ): ReadonlyMap<string, number> {
   const starts = new Map<string, number>();
   for (const crease of creases) {
-    const split = likeliestSplit(crease, (date) => everyNightCounted || counted.has(date));
+    const split = roundedSplit(crease, (date) => everyNightCounted || counted.has(date));
     crease.goalies.forEach((goalie, index) => {
       if (goalie.playerId !== undefined) {
         starts.set(goalie.playerId, split[index]);
@@ -376,46 +379,38 @@ export function projectedStarts(
   return starts;
 }
 
-interface Split {
-  readonly counts: readonly number[];
-  readonly chance: number;
-}
-
 /**
- * Two splits whose chances differ by less than this share of either are a tie: what parts them
- * is the arithmetic's rounding, not one being likelier.
+ * Two expectations or remainders that differ by less than this are equal: what parts them is the
+ * arithmetic's rounding (three nights at a third come to 0.9999…), not one being larger.
  */
 const TIED = 1e-9;
 
 /**
- * The likeliest number of starts each goalie of a crease makes on the nights kept, with one more
- * count, last, for a goalie the model does not name: a night whose shares come to less than one
- * start leaves the rest to him. Each night is its own draw from that night's shares, so the answer
- * is the commonest outcome of their sum, found by walking the nights and keeping every split
- * reachable with its chance — a few hundred at most over a month of a three-man crease. A tie goes
- * to the split giving more to the goalie listed first, who has the most starts over the stretch.
+ * Each goalie of a crease's expected starts on the nights kept, rounded to whole games by largest
+ * remainder, with one more count, last, for a goalie the model does not name: a night whose shares
+ * come to less than one start leaves the rest to him. Each goalie keeps the whole games of his
+ * expectation, and the games still unclaimed go one each to the largest fractions left, so the
+ * counts add up to the nights and none is more than a game from what he is expected to start. A tie
+ * goes to the goalie listed first, who has the most starts over the stretch.
  */
-function likeliestSplit(crease: PlannerCrease, kept: (date: string) => boolean): readonly number[] {
-  const nights = new Set(
-    crease.goalies.flatMap((goalie) => goalie.nights.map((night) => night.date)),
-  );
-  let splits: Split[] = [{ counts: new Array(crease.goalies.length + 1).fill(0), chance: 1 }];
-  for (const date of [...nights].filter(kept)) {
-    const chances = nightChances(crease, date);
-    const next = new Map<string, Split>();
-    for (const split of splits) {
-      chances.forEach((chance, index) => {
-        if (chance <= 0) {
-          return;
-        }
-        const counts = split.counts.map((count, at) => (at === index ? count + 1 : count));
-        const key = counts.join();
-        next.set(key, { counts, chance: (next.get(key)?.chance ?? 0) + split.chance * chance });
-      });
-    }
-    splits = [...next.values()];
+function roundedSplit(crease: PlannerCrease, kept: (date: string) => boolean): readonly number[] {
+  const nights = [
+    ...new Set(crease.goalies.flatMap((goalie) => goalie.nights.map((night) => night.date))),
+  ].filter(kept);
+  const expected = new Array<number>(crease.goalies.length + 1).fill(0);
+  for (const date of nights) {
+    nightChances(crease, date).forEach((chance, index) => (expected[index] += chance));
   }
-  return splits.reduce((best, split) => (likelier(split, best) ? split : best), splits[0]).counts;
+  const counts = expected.map((games) => Math.floor(games + TIED));
+  const unclaimed = nights.length - counts.reduce((sum, count) => sum + count, 0);
+  expected
+    .map((games, index) => ({ index, remainder: games - counts[index] }))
+    .sort((a, b) =>
+      Math.abs(a.remainder - b.remainder) > TIED ? b.remainder - a.remainder : a.index - b.index,
+    )
+    .slice(0, unclaimed)
+    .forEach(({ index }) => counts[index]++);
+  return counts;
 }
 
 /** Each goalie's chance of starting the night, and last the unnamed goalie's: one in all. */
@@ -427,18 +422,6 @@ function nightChances(crease: PlannerCrease, date: string): number[] {
   // A crease whose starts run past the schedule (a goalie traded in with his own) is held to the
   // one start a night has.
   return total > 1 ? [...shares.map((share) => share / total), 0] : [...shares, 1 - total];
-}
-
-function likelier(split: Split, than: Split): boolean {
-  if (Math.abs(split.chance - than.chance) > TIED * Math.max(split.chance, than.chance)) {
-    return split.chance > than.chance;
-  }
-  for (let at = 0; at < split.counts.length; at++) {
-    if (split.counts[at] !== than.counts[at]) {
-      return split.counts[at] > than.counts[at];
-    }
-  }
-  return false;
 }
 
 /**
