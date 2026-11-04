@@ -11,6 +11,7 @@ import {
 } from '../draft-projection/projection-defaults';
 import { DEFAULT_DECIMAL_SETTINGS } from '../draft-projection/projection-settings-section/model';
 import { nhlTeamKey } from '../models/nhl-team';
+import { withFlexSlots } from '../models/roster-slots';
 import { Projection, ScoredProjection } from '../models/projection.model';
 import { isAllSkaters } from '../models/position.model';
 import { ScoringStatKey } from '../models/stat-key.model';
@@ -343,6 +344,12 @@ export class PlayerScoutComponent {
       activeScoringColumns: new Set(
         (settings?.activeScoringColumns as ScoringStatKey[] | undefined) ?? DEFAULT_SCORING_COLUMNS,
       ),
+      // How many players a league this size starts sets a category league's nought and spread:
+      // the league's own, so a ten-team league is not ranked as if it had twelve.
+      leagueSize: settings?.leagueSize ?? DEFAULT_LEAGUE_SIZE,
+      rosterSlots: settings?.rosterSlots
+        ? withFlexSlots(settings.rosterSlots)
+        : DEFAULT_ROSTER_SLOTS,
     };
   });
 
@@ -443,8 +450,8 @@ export class PlayerScoutComponent {
       scoringType: scoring.scoringType,
       statWeights: scoring.statWeights,
       activeScoringColumns: scoring.activeScoringColumns,
-      leagueSize: DEFAULT_LEAGUE_SIZE,
-      rosterSlots: DEFAULT_ROSTER_SLOTS,
+      leagueSize: scoring.leagueSize,
+      rosterSlots: scoring.rosterSlots,
       // A goalie on the wire is rarely anyone's starter, and the season minimum is there to keep
       // a backup off a season table. Applied here it would rank most of them out of the list.
       minGoalieGames: 0,

@@ -284,6 +284,20 @@ describe('PlayerScoutComponent', () => {
     ).toEqual([0, 0]);
   });
 
+  it("sets a category league's nought at the last starter of a league its own size", async () => {
+    // One team of eleven skater seats: nought is the eleventh-best skater, where a twelve-team
+    // league's default would put it past every skater in the pool.
+    settings = { ...SETTINGS, scoringType: 'category', leagueSize: 1 };
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+
+    const skaters = page.ranked().filter((row) => row.line.type === 'skater');
+    // The eighth to the twelfth tie on 30 points, so the eleventh is one of them.
+    expect(skaters[10].score).toBeCloseTo(0, 10);
+    expect(skaters[6].score).toBeGreaterThan(0);
+    expect(skaters[12].score).toBeLessThan(0);
+  });
+
   it('switches the comparison on against the preseason, then a day, and reads again for the day', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
