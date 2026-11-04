@@ -298,6 +298,39 @@ describe('PlayerScoutComponent', () => {
     expect(skaters[12].score).toBeLessThan(0);
   });
 
+  it("ranks position-adjusted on the press, against the league's own spots, and back again", async () => {
+    // One team: its four D spots go to Montour and three 70-point defencemen, so the fifth's 11
+    // is the level, while the centres' is the best depth centre left over at 69.
+    settings = { ...SETTINGS, leagueSize: 1 };
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    expect(ids(page.ranked()).slice(0, 3)).toEqual(['201', '301', '99']);
+
+    page.togglePositionAdjusted();
+    fixture.detectChanges();
+
+    expect(ids(page.ranked()).slice(0, 3)).toEqual(['201', '99', '301']);
+    const montour = page.ranked()[1];
+    expect(montour.score).toBe(116);
+    expect(montour.adjusted).toBe(116 - 11);
+    expect(montour.positionRank).toBe('D1');
+    expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'adjusted')).toBe(true);
+    // The new ranked order wears its own heading; Points then sorts by the score itself.
+    expect(page.sort()).toEqual({ key: 'adjusted', descending: true });
+    expect(ids(page.sorted())[0]).toBe('99');
+    page.sortBy('score');
+    expect(ids(page.sorted()).indexOf('301')).toBeLessThan(ids(page.sorted()).indexOf('99'));
+    page.sortBy('adjusted');
+    expect(page.sort().key).toBe('adjusted');
+
+    page.togglePositionAdjusted();
+    fixture.detectChanges();
+
+    expect(ids(page.ranked()).slice(0, 3)).toEqual(['201', '301', '99']);
+    // Its column gone, the order falls back to the ranked one.
+    expect(page.sort()).toEqual({ key: 'score', descending: true });
+  });
+
   it('switches the comparison on against the preseason, then a day, and reads again for the day', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;

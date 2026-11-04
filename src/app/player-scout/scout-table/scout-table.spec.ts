@@ -26,6 +26,8 @@ interface RowOptions {
   readonly rising?: boolean;
   readonly owner?: ScoutPlayer['owner'];
   readonly availability?: ScoutPlayer['freeAgent']['availability'];
+  readonly adjusted?: number | null;
+  readonly positionRank?: string | null;
 }
 
 function row(playerId: number, name: string, rank: number, options: RowOptions = {}): ScoutRow {
@@ -66,6 +68,8 @@ function row(playerId: number, name: string, rank: number, options: RowOptions =
     delta: then ? (options.delta ?? 0) : null,
     rise: thenRank === null ? null : thenRank - rank,
     rising: options.rising ?? false,
+    adjusted: options.adjusted ?? null,
+    positionRank: options.positionRank ?? null,
   };
 }
 
@@ -110,6 +114,7 @@ describe('ScoutTableComponent', () => {
       dropScore?: number | null;
       streaming?: boolean;
       showOwner?: boolean;
+      adjusted?: boolean;
     } = {},
   ) {
     return MockRender(ScoutTableComponent, {
@@ -132,6 +137,35 @@ describe('ScoutTableComponent', () => {
     expect(ngMocks.findAll(fixture, '.scout-tag')).toHaveLength(0);
     expect(ngMocks.formatText(ngMocks.find(fixture, 'td.rank-col'))).toBe('1');
     expect(ngMocks.formatText(ngMocks.find(fixture, 'td.score-col'))).toBe('85.0');
+  });
+
+  it('shows no adjusted column while the list is ranked by the score', () => {
+    const fixture = render([risen()]);
+
+    expect(ngMocks.findAll(fixture, '.adjusted-col')).toHaveLength(0);
+  });
+
+  it('ranked position-adjusted, writes his score over replacement after the score, with his position rank under it, and sorts by it', () => {
+    const fixture = render(
+      [
+        row(1, 'Brandon Montour', 1, { adjusted: 42.25, positionRank: 'D3' }),
+        row(2, 'Vince Dunn', 2, { adjusted: 0, positionRank: 'D30' }),
+      ],
+      { adjusted: true },
+    );
+    const sortBy = vi.fn();
+    fixture.point.componentInstance.sortBy.subscribe(sortBy);
+
+    const [first, second] = ngMocks.findAll(fixture, 'td.adjusted-col');
+    expect(ngMocks.formatText(ngMocks.find(first, '.figure-now'))).toBe('+42.3');
+    expect(ngMocks.formatText(ngMocks.find(first, '.delta'))).toBe('D3');
+    // The replacement player himself reads nought, not a blank.
+    expect(ngMocks.formatText(ngMocks.find(second, '.figure-now'))).toBe('0.0');
+    expect(fixture.point.componentInstance.rankTip()).toBe(
+      'Position-adjusted rank among every player in the league',
+    );
+    press(fixture, 'Adjusted');
+    expect(sortBy).toHaveBeenCalledWith('adjusted');
   });
 
   it('with a comparison on, tags the riser and writes the places gained under his rank and the change under his score', () => {

@@ -56,6 +56,7 @@ import {
   nextScoutSort,
   rankScout,
   SCOUT_MOVERS_ORDER,
+  SCOUT_ADJUSTED_ORDER,
   SCOUT_RANKED_ORDER,
   ScoutRow,
   ScoutSort,
@@ -484,8 +485,30 @@ export class PlayerScoutComponent {
       return [];
     }
     const { rank, scoreOf } = this.ranker();
-    return rankScout(list.players, rank, scoreOf);
+    const { leagueSize, rosterSlots } = this.scoring();
+    const lineup = this.positionAdjusted() ? { slots: rosterSlots, teams: leagueSize } : null;
+    return rankScout(list.players, rank, scoreOf, lineup);
   });
+
+  /**
+   * Ranked position-adjusted: each player by his score over the best player at his position a
+   * league this size leaves without a starting spot, so a defenceman who scores as a winger does
+   * comes first where defencemen are scarcer. Off, the list is ranked by the score.
+   */
+  readonly positionAdjusted = signal(false);
+
+  /**
+   * On, the list opens in its new ranked order, which the Adjusted heading wears; any other order
+   * the reader picked stays. Off, an order by the Adjusted column falls back to the score's.
+   */
+  togglePositionAdjusted(): void {
+    const on = !this.positionAdjusted();
+    this.positionAdjusted.set(on);
+    const sort = this.sortPicked();
+    if (on && sort.key === SCOUT_RANKED_ORDER.key && sort.descending) {
+      this.sortPicked.set(SCOUT_ADJUSTED_ORDER);
+    }
+  }
 
   /** The league's teams as the pool offers them, the user's own first. */
   readonly leagueTeams = computed<readonly LeagueTeamOption[]>(() => {
@@ -940,7 +963,13 @@ export class PlayerScoutComponent {
     if (this.gains() !== null) {
       about.push('gain', 'scoreGain');
     }
-    return about.includes(sort.key) ? sort : SCOUT_RANKED_ORDER;
+    if (this.positionAdjusted()) {
+      about.push('adjusted');
+    }
+    if (about.includes(sort.key)) {
+      return sort;
+    }
+    return this.positionAdjusted() ? SCOUT_ADJUSTED_ORDER : SCOUT_RANKED_ORDER;
   });
 
   /** Sorts the whole list by a column, best first; the same column again turns it round. */

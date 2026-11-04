@@ -123,6 +123,11 @@ export class ScoutTableComponent {
    * what a streamer would score in it that night rather than at nothing.
    */
   readonly streaming = input<boolean>(false);
+  /**
+   * Whether the list is ranked position-adjusted, so the rank counts the score over each
+   * position's replacement and a column after the score shows it.
+   */
+  readonly adjusted = input<boolean>(false);
   /** The order the list is in, which the headings show. */
   readonly sort = input<ScoutSort>(SCOUT_RANKED_ORDER);
   /** A heading pressed: the page sorts the whole list by that column, or turns it round. */
@@ -161,10 +166,19 @@ export class ScoutTableComponent {
   /** How many columns the projection group spans: score, games, ice time and the categories. */
   readonly projectionSpan = computed(() => 2 + (this.anySkater() ? 1 : 0) + this.columns().length);
 
-  readonly rankTip = computed(() =>
-    this.compare()
+  readonly rankTip = computed(() => {
+    if (this.adjusted()) {
+      return this.compare()
+        ? 'Adjusted rank, and places moved since the chosen day'
+        : 'Position-adjusted rank among every player in the league';
+    }
+    return this.compare()
       ? 'League rank, and places moved since the chosen day'
-      : 'Rank among every player in the league',
+      : 'Rank among every player in the league';
+  });
+
+  readonly adjustedTip = computed(
+    () => `${this.scoreHeading()} over the best unstarted player at his position`,
   );
 
   readonly scoreHeading = computed(() => (this.scoringType() === 'points' ? 'Points' : 'Z-Score'));
@@ -224,6 +238,15 @@ export class ScoutTableComponent {
 
   score(row: ScoutRow): string {
     return row.score.toFixed(this.scoreDigits());
+  }
+
+  /** "+120.4": his score over his position's replacement, signed; blank where it is not measured. */
+  adjustedScore(row: ScoutRow): string {
+    if (row.adjusted === null) {
+      return '';
+    }
+    // The replacement player himself is nought, written as one rather than left blank.
+    return signed(row.adjusted, this.scoreDigits()).text || (0).toFixed(this.scoreDigits());
   }
 
   /** The change in score since the day; null without a then-line or a comparison. */

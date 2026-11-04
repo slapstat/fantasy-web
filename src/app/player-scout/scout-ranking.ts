@@ -1,4 +1,6 @@
+import { RosterSlots } from '../api/models/roster-slots';
 import { Projection, ScoredProjection } from '../models/projection.model';
+import { valueOverReplacement } from '../models/replacement-level';
 import { compareStatValues } from '../models/sorting';
 import { LOWER_IS_BETTER_SCORING_STAT_KEYS, ScoringStatKey } from '../models/stat-key.model';
 import { ScoutPlayer } from '../services/player-scout.service';
@@ -30,6 +32,20 @@ export interface ScoutRow extends RankedFreeAgent {
   readonly rise: number | null;
   /** Risen far enough that a draft would have taken him had it known: see {@link isRising}. */
   readonly rising: boolean;
+  /**
+   * Ranked position-adjusted: his score less his position's replacement level (see
+   * {@link valueOverReplacement}). Null when the list is ranked on the score alone, or for a
+   * player with no position the league starts.
+   */
+  readonly adjusted: number | null;
+  /** Where he ranks at the position he is measured at, `D3`; null as {@link adjusted} is. */
+  readonly positionRank: string | null;
+}
+
+/** What a league starts, which a position-adjusted ranking measures every player against. */
+export interface ScoutLineup {
+  readonly slots: RosterSlots;
+  readonly teams: number;
 }
 
 /** Fewer places than this is the noise of a ranking, not a change of role. */
@@ -58,32 +74,66 @@ export function isRising(rank: number, thenRank: number | null): boolean {
  * the rest of the league, and the league is the same players either way. The chosen day's line
  * comes re-spread over today's games left, so the scores compare stat for stat as well.
  *
+ * <p>With a lineup, both lines are ranked position-adjusted instead: each by its own replacement
+ * levels, since a level is read off the players as the line values them. The score and its
+ * change stay the score's, so a drop's cost and a pickup's gain read as they do without it.
+ *
  * @param rank ranks lines by the league's scoring, best first, as the ranking engine does
+ * @param lineup what the league starts, to rank position-adjusted; null to rank by the score
  */
 export function rankScout(
   players: readonly ScoutPlayer[],
   rank: (projections: Projection[]) => ScoredProjection[],
   scoreOf: (entry: ScoredProjection) => number,
+  lineup: ScoutLineup | null = null,
 ): ScoutRow[] {
   const byPlayerId = new Map(
     players.map((player) => [player.freeAgent.projection.playerId, player]),
   );
+  const positions = new Map(
+    players.map((player) => [player.freeAgent.projection.playerId, player.freeAgent.positions]),
+  );
+  const order = (projections: Projection[]) => {
+    const entries = rank(projections);
+    if (!lineup) {
+      return { entries, valued: null };
+    }
+    const valued = valueOverReplacement(
+      new Map(entries.map((entry) => [entry.projection.playerId, scoreOf(entry)])),
+      positions,
+      lineup.slots,
+      lineup.teams,
+    );
+    const over = (entry: ScoredProjection) =>
+      valued.get(entry.projection.playerId)?.overReplacement ?? null;
+    // Best first over replacement; a player it cannot measure last, and a tie keeps the score's order.
+    const place = new Map(entries.map((entry, index) => [entry, index]));
+    const sorted = [...entries].sort(
+      (a, b) =>
+        compareStatValues(over(a), over(b), -1) || (place.get(a) ?? 0) - (place.get(b) ?? 0),
+    );
+    return { entries: sorted, valued };
+  };
 
   const thenRanks = new Map<number, number>();
   const thenScores = new Map<number, number>();
-  rank(players.flatMap((player) => (player.then ? [player.then] : []))).forEach((entry, index) => {
-    thenRanks.set(entry.projection.playerId, index + 1);
-    thenScores.set(entry.projection.playerId, scoreOf(entry));
-  });
+  order(players.flatMap((player) => (player.then ? [player.then] : []))).entries.forEach(
+    (entry, index) => {
+      thenRanks.set(entry.projection.playerId, index + 1);
+      thenScores.set(entry.projection.playerId, scoreOf(entry));
+    },
+  );
 
   const rows: ScoutRow[] = [];
-  for (const entry of rank(players.map((player) => player.freeAgent.projection))) {
+  const now = order(players.map((player) => player.freeAgent.projection));
+  for (const entry of now.entries) {
     const player = byPlayerId.get(entry.projection.playerId);
     if (!player) {
       continue;
     }
     const place = rows.length + 1;
     const score = scoreOf(entry);
+    const valued = now.valued?.get(entry.projection.playerId) ?? null;
     const thenRank = player.then ? (thenRanks.get(entry.projection.playerId) ?? null) : null;
     const thenScore = player.then ? (thenScores.get(entry.projection.playerId) ?? null) : null;
     rows.push({
@@ -99,6 +149,8 @@ export function rankScout(
       delta: thenScore === null ? null : score - thenScore,
       rise: thenRank === null ? null : thenRank - place,
       rising: isRising(place, thenRank),
+      adjusted: valued?.overReplacement ?? null,
+      positionRank: valued?.positionRank ?? null,
     });
   }
   return rows;
@@ -136,10 +188,11 @@ export type ChangeSortKey = `change:${ChangeKey}`;
 /**
  * A column the list can be sorted by: the planner's; the change in score, the places gained and
  * the change in any other figure since the chosen day; and, against the chosen drop, his
- * projection less the drop's and what the lineup gains by him.
+ * projection less the drop's and what the lineup gains by him; and his score over his
+ * position's replacement, in a position-adjusted ranking.
  */
 export type ScoutSortKey =
-  FreeAgentSortKey | 'delta' | 'rise' | 'gain' | 'scoreGain' | ChangeSortKey;
+  FreeAgentSortKey | 'delta' | 'rise' | 'gain' | 'scoreGain' | 'adjusted' | ChangeSortKey;
 
 export interface ScoutSort {
   readonly key: ScoutSortKey;
@@ -148,6 +201,12 @@ export interface ScoutSort {
 
 /** The list as ranked: best first on the rest of the season, which is what the # column counts. */
 export const SCOUT_RANKED_ORDER: ScoutSort = RANKED_ORDER;
+
+/**
+ * The ranked order of a position-adjusted list, under the heading that says so. Rows are ranked by
+ * it already, so it leaves them as they came.
+ */
+export const SCOUT_ADJUSTED_ORDER: ScoutSort = { key: 'adjusted', descending: true };
 
 /** The order the page opens in: the players the model makes the most more of since the day. */
 export const SCOUT_MOVERS_ORDER: ScoutSort = { key: 'delta', descending: true };
@@ -168,6 +227,7 @@ function isScoutKey(key: ScoutSortKey): key is Exclude<ScoutSortKey, FreeAgentSo
     key === 'rise' ||
     key === 'gain' ||
     key === 'scoreGain' ||
+    key === 'adjusted' ||
     changeOf(key) !== null
   );
 }
@@ -237,6 +297,8 @@ function scoutSortValue(
     // wears the arrow.
     case 'scoreGain':
       return row.score;
+    case 'adjusted':
+      return row.adjusted;
     default:
       return changeValue(row, changeOf(key) as ChangeKey);
   }
@@ -255,6 +317,12 @@ export function sortScout(
   gains: ReadonlyMap<string, number | null> = new Map(),
 ): readonly ScoutRow[] {
   const { key } = sort;
+  // A position-adjusted list is not in the score's order, so the score sorts itself rather than
+  // being taken for the ranked order the planner leaves alone.
+  if (key === 'score' && rows.some((row) => row.adjusted !== null)) {
+    const sign = sort.descending ? -1 : 1;
+    return [...rows].sort((a, b) => sign * (a.score - b.score) || a.rank - b.rank);
+  }
   if (!isScoutKey(key)) {
     return sortFreeAgents(rows, { key, descending: sort.descending });
   }
