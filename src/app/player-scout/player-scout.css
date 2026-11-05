@@ -188,6 +188,11 @@ select:focus-visible,
   outline-offset: 1px;
 }
 
+/* The short label for a phone; a wide screen has room for the whole one. */
+.pill-narrow {
+  display: none;
+}
+
 .pill--active {
   background: var(--color-primary);
   border-color: var(--color-primary);
@@ -758,22 +763,47 @@ select:focus-visible,
     flex: 1 1 100%;
   }
 
-  /* The toolbar stacks: the search first and full width, as the quickest way to a player on a
-     phone; the two selects share a line; the positions wrap on a line of their own. */
+  /* The lede says what the title already does; on a phone the list matters more than its line. */
+  .lede {
+    display: none;
+  }
+
+  .card-head {
+    margin-bottom: var(--space-3);
+  }
+
+  /* The toolbar in three lines: the search and whose players, the quickest way to a player and
+     the question that sets the list; the positions; the club and the user's own. */
   .toolbar {
-    gap: var(--space-2) var(--space-3);
+    gap: var(--space-2);
   }
 
   .search {
-    flex: 1 1 100%;
+    flex: 1 1 45%;
     margin-left: 0;
     max-width: none;
-    order: -1;
+    min-width: 0;
+    order: -2;
   }
 
   .field {
-    flex: 1 1 calc(50% - var(--space-2));
+    flex: 1 1 auto;
     min-width: 0;
+  }
+
+  /* Whose players beside the search, its label left to the select's own name. */
+  .field--pool {
+    flex: 1 1 50%;
+    order: -1;
+  }
+
+  .field--pool .field-label {
+    clip: rect(0 0 0 0);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
   }
 
   .field select {
@@ -784,6 +814,72 @@ select:focus-visible,
 
   .toolbar .pills {
     flex: 1 1 100%;
+    gap: var(--space-1);
+  }
+
+  .toolbar .pill {
+    padding: var(--space-1) var(--space-2);
+  }
+
+  /* Out of the layout, still the button's name. */
+  .pill-wide {
+    clip: rect(0 0 0 0);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  .toolbar .pill {
+    position: relative;
+  }
+
+  .pill-narrow {
+    display: inline;
+  }
+
+  /* A full roster's drops: the lead and Show all on one line, the chips under it in one row that
+     scrolls sideways, rather than a line for each chip. */
+  .room-box:has(.floor) {
+    position: relative;
+  }
+
+  .room-box:has(.floor) .roster-toggle {
+    position: absolute;
+    right: var(--space-3);
+    top: var(--space-2);
+  }
+
+  .floor {
+    min-width: 0;
+  }
+
+  .floor-body {
+    align-items: stretch;
+    flex: 1 1 auto;
+    flex-direction: column;
+    /* One line: a wrapping column is as wide as its widest child, and the chips would push it. */
+    flex-wrap: nowrap;
+    gap: var(--space-2);
+  }
+
+  .drop-chips {
+    flex-wrap: nowrap;
+    margin-right: calc(-1 * var(--space-3));
+    overflow-x: auto;
+    padding-bottom: 2px;
+    padding-right: var(--space-3);
+    scrollbar-width: none;
+  }
+
+  .drop-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pill--drop {
+    flex: none;
+    white-space: nowrap;
   }
 
   .compare-line {

@@ -22,7 +22,7 @@
            which positions, from which NHL club, the user's own beside them, or one by name. One
            toolbar, since they are all the same question. -->
       <div class="toolbar">
-        <label class="field">
+        <label class="field field--pool">
           <span class="field-label">Show</span>
           <select aria-label="Whose players to show" [value]="pool()" (change)="onPool($event)">
             <optgroup label="By status">
@@ -62,7 +62,9 @@
             [attr.aria-pressed]="allSkaters()"
             (click)="toggleAllSkaters()"
           >
-            All skaters
+            <!-- "Skaters" on a phone, so the seven positions keep to one line. -->
+            <span class="pill-wide">All skaters</span
+            ><span class="pill-narrow" aria-hidden="true">Skaters</span>
           </button>
           @for (option of positionOptions; track option) {
             <button
