@@ -55,6 +55,7 @@ export function player(
     owner: null,
     then,
     thenProjected: new Set(then ? ['points'] : []),
+    lineup: null,
     ...extra,
   };
 }

@@ -3,6 +3,7 @@ import { MockBuilder, MockRender, ngMocks } from 'ng-mocks';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Projection } from '../../models/projection.model';
 import { ScoutPlayer } from '../../services/player-scout.service';
+import { PageListing } from '../lineup-role';
 import { ScoutRow } from '../scout-ranking';
 import { ScoutTableComponent } from './scout-table';
 
@@ -28,6 +29,7 @@ interface RowOptions {
   readonly availability?: ScoutPlayer['freeAgent']['availability'];
   readonly adjusted?: number | null;
   readonly positionRank?: string | null;
+  readonly lineup?: PageListing | null;
 }
 
 function row(playerId: number, name: string, rank: number, options: RowOptions = {}): ScoutRow {
@@ -54,6 +56,7 @@ function row(playerId: number, name: string, rank: number, options: RowOptions =
     owner: options.owner ?? null,
     then,
     thenProjected: new Set(then ? ['goals', 'assists'] : []),
+    lineup: options.lineup ?? null,
   };
   return {
     scout,
@@ -137,6 +140,18 @@ describe('ScoutTableComponent', () => {
     expect(ngMocks.findAll(fixture, '.scout-tag')).toHaveLength(0);
     expect(ngMocks.formatText(ngMocks.find(fixture, 'td.rank-col'))).toBe('1');
     expect(ngMocks.formatText(ngMocks.find(fixture, 'td.score-col'))).toBe('85.0');
+  });
+
+  it('tags each player with where the lineup page lists him today', () => {
+    const fixture = render([
+      row(1, 'Brandon Montour', 1, {
+        lineup: { line: 'd2', powerPlayUnit: 1, penaltyKillUnit: 2 },
+      }),
+      row(2, 'Vince Dunn', 2),
+    ]);
+
+    const tags = ngMocks.findAll(fixture, '.scout-tag--lineup');
+    expect(tags.map((tag) => ngMocks.formatText(tag))).toEqual(['D2 · PP1 · PK2']);
   });
 
   it('shows no adjusted column while the list is ranked by the score', () => {

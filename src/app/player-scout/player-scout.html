@@ -85,6 +85,31 @@
             }
           </select>
         </label>
+        <!-- Who today's Daily Faceoff page lists on a line, pair or unit. One role at a time, as
+             Club is one club: the groups are the page's own. -->
+        <label class="field">
+          <span class="field-label">Lineup</span>
+          <select
+            aria-label="Lineup role"
+            [value]="lineupRole() ?? ''"
+            [disabled]="!lineupSeenOn()"
+            [appTooltip]="
+              lineupSeenOn()
+                ? 'Daily Faceoff lineups, read ' + lineupSeenOn()
+                : 'No lineup page could be read today'
+            "
+            (change)="onLineupRole($event)"
+          >
+            <option value="">Any role</option>
+            @for (group of lineupRoleGroups; track group.label) {
+              <optgroup [label]="group.label">
+                @for (option of group.roles; track option.role) {
+                  <option [value]="option.role">{{ option.label }}</option>
+                }
+              </optgroup>
+            }
+          </select>
+        </label>
         <label class="tick" [class.tick--moot]="poolShowsMine()">
           <input
             type="checkbox"

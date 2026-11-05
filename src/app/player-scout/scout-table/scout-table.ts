@@ -11,6 +11,7 @@ import { IconComponent } from '../../shared/icon/icon';
 import { PositionChipsComponent } from '../../shared/position-chips/position-chips';
 import { TeamLogoComponent } from '../../shared/team-logo/team-logo';
 import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
+import { listingLabel } from '../lineup-role';
 import {
   formatGames,
   formatToi,
@@ -396,6 +397,11 @@ export class ScoutTableComponent {
    * It read "Mine" there once, and "Mine" beside a column of team names looked like one more
    * team; the template marks the user's own by look instead.
    */
+  /** Where today's lineup page lists him, `F2 · PP1`; null when it gives him no role. */
+  lineupTag(row: ScoutRow): string | null {
+    return listingLabel(row.scout.lineup);
+  }
+
   ownerTag(row: ScoutRow): string {
     return row.scout.owner?.teamName ?? 'FA';
   }
