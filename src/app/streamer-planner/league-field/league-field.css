@@ -97,11 +97,40 @@
   flex: 1 1 100%;
 }
 
-/* On a phone the line is the width of the screen, and the league takes all of it. */
+/* On a phone the line is the width of the screen: the tabs shrink to their marks and the league
+   takes the rest, on one line. The label leaves the layout but still names the select. */
 @media (max-width: 640px) {
-  :host(.league-field--inline) .field-row,
+  :host(.league-field--inline) .league-field {
+    gap: var(--space-2);
+  }
+
+  :host(.league-field--inline) .field-label {
+    clip: rect(0 0 0 0);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  :host(.league-field--inline) app-platform-tabs {
+    flex: none;
+  }
+
+  /* A zero basis, so the row shares the tabs' line rather than wrapping under them. */
+  :host(.league-field--inline) .field-row {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
   :host(.league-field--inline) .field-select {
+    flex: 1 1 auto;
+    padding: var(--space-1) var(--space-2);
+    width: 100%;
+  }
+
+  :host(.league-field--inline) app-espn-league-sync,
+  :host(.league-field--inline) .field-error {
     flex: 1 1 100%;
-    width: auto;
   }
 }

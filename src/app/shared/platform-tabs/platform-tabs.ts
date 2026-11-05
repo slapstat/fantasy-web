@@ -15,6 +15,7 @@ export type Platform = 'yahoo' | 'espn';
   templateUrl: './platform-tabs.html',
   styleUrl: './platform-tabs.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class.platform-tabs--compact]': 'compact()' },
 })
 export class PlatformTabsComponent {
   /** The platforms to offer, in order. */
@@ -23,6 +24,11 @@ export class PlatformTabsComponent {
   readonly label = input.required<string>();
   /** The platform chosen, or `none` while nothing is. */
   readonly selected = input<Platform | 'none'>('none');
+  /**
+   * On a phone, the marks alone: the names leave the layout but stay each tab's accessible name.
+   * For a line that must also hold the league beside the tabs.
+   */
+  readonly compact = input(false);
   /** A tab clicked; `[(selected)]` opens it at once. */
   readonly selectedChange = output<Platform>();
 }

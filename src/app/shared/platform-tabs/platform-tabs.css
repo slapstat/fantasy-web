@@ -46,3 +46,20 @@
   background: var(--color-primary);
   color: #fff;
 }
+
+/* Compact, on a phone: the marks alone, each name kept for a screen reader. */
+@media (max-width: 640px) {
+  :host(.platform-tabs--compact) .provider-tab {
+    position: relative;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  :host(.platform-tabs--compact) .provider-name {
+    clip: rect(0 0 0 0);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+}
