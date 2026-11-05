@@ -5,6 +5,7 @@
     <app-platform-tabs
       label="Fantasy platform to plan a league from"
       [platforms]="platforms"
+      [compact]="layout() === 'inline'"
       [(selected)]="platform"
     />
   }
