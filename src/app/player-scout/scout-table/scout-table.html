@@ -57,6 +57,21 @@
             </button>
           }
         </th>
+        @if (adjusted()) {
+          <th scope="col" class="num adjusted-col" [attr.aria-sort]="ariaSort('adjusted')">
+            <button
+              type="button"
+              class="sort"
+              [appTooltip]="adjustedTip()"
+              (click)="sortBy.emit('adjusted')"
+            >
+              @if (sort().key === 'adjusted') {
+                <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
+              }
+              Adjusted
+            </button>
+          </th>
+        }
         <th scope="col" class="num" [attr.aria-sort]="ariaSort('games', changeKey('games'))">
           <button
             type="button"
@@ -252,6 +267,16 @@
               <span class="delta" [class]="'delta delta--' + delta.dir">{{ delta.text }}</span>
             }
           </td>
+          @if (adjusted()) {
+            <!-- His position's rank under the figure, where a change sits under the others: the
+                 rank he is measured at, which is why a defenceman can stand over a winger. -->
+            <td class="num adjusted-col">
+              <span class="figure-now">{{ adjustedScore(entry.row) }}</span>
+              @if (entry.row.positionRank; as positionRank) {
+                <span class="delta delta--note">{{ positionRank }}</span>
+              }
+            </td>
+          }
           <td class="num">
             <span class="figure-now">{{ games(entry.row) }}</span>
             @if (deltaGames(entry.row); as delta) {

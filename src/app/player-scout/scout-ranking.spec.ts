@@ -156,6 +156,75 @@ describe('rankScout', () => {
   });
 });
 
+describe('rankScout, position-adjusted', () => {
+  // A league of two teams, each starting one centre and two defencemen: four defencemen start to
+  // two centres, so the fifth defenceman's 30 is the level, against the third centre's 80.
+  const lineup = {
+    slots: { c: 1, lw: 0, rw: 0, w: 0, f: 0, d: 2, g: 0, util: 0, bn: 0 },
+    teams: 2,
+  };
+  const centre = (id: number, now: number, then: number) =>
+    player(skaterLine(id, now), skaterLine(id, then), {});
+  const at = (positions: string[], scout: ScoutPlayer): ScoutPlayer => ({
+    ...scout,
+    freeAgent: { ...scout.freeAgent, positions },
+  });
+  const players = [
+    at(['C'], centre(1, 100, 100)),
+    at(['C'], centre(2, 90, 90)),
+    at(['C'], centre(3, 80, 80)),
+    // On the day he was the fifth defenceman, the level himself.
+    at(['D'], player(skaterLine(11, 50), skaterLine(11, 30))),
+    at(['D'], player(skaterLine(12, 45), skaterLine(12, 45))),
+    at(['D'], player(skaterLine(13, 40), skaterLine(13, 40))),
+    at(['D'], player(skaterLine(14, 35), skaterLine(14, 35))),
+    at(['D'], player(skaterLine(15, 30), skaterLine(15, 32))),
+  ];
+
+  const rows = rankScout(players, byValue, fantasyPoints, lineup);
+  const ids = rows.map((row) => row.player.playerId);
+
+  it('ranks by the score over his position’s replacement, the score’s order breaking a tie', () => {
+    // 1 and 11 are both 20 over; 12 is 15 over, ahead of the second centre's 10.
+    expect(ids.slice(0, 4)).toEqual(['1', '11', '12', '2']);
+    expect(rows.map((row) => row.rank).slice(0, 4)).toEqual([1, 2, 3, 4]);
+    expect(rows[1].adjusted).toBeCloseTo(20, 9);
+    expect(rows[1].positionRank).toBe('D1');
+  });
+
+  it('keeps the score and its change the score’s', () => {
+    expect(rows[1].score).toBe(50);
+    expect(rows[1].delta).toBe(20);
+  });
+
+  it("ranks the day's line by its own levels, so the rise reads the adjusted places", () => {
+    // On the day the defencemen ran 45, 40, 35, 32, 30: 30 was the level, so 11 was last.
+    expect(rows[1].thenRank).toBe(8);
+    expect(rows[1].rise).toBe(6);
+  });
+
+  it('ranks by the score alone without a lineup', () => {
+    const plain = rankScout(players, byValue, fantasyPoints);
+    expect(plain.map((row) => row.player.playerId).slice(0, 4)).toEqual(['1', '2', '3', '11']);
+    expect(plain[0].adjusted).toBeNull();
+    expect(plain[0].positionRank).toBeNull();
+  });
+
+  it('sorts a position-adjusted list by the score when asked, not taking it for the ranked order', () => {
+    const sorted = sortScout(rows, SCOUT_RANKED_ORDER);
+    expect(sorted.map((row) => row.player.playerId).slice(0, 4)).toEqual(['1', '2', '3', '11']);
+  });
+
+  it('sorts by the adjusted figure under its own key', () => {
+    const sorted = sortScout(rows, { key: 'adjusted', descending: false });
+    expect(sorted[0].adjusted).toBeLessThanOrEqual(sorted[sorted.length - 1].adjusted ?? 0);
+    expect(nextScoutSort(SCOUT_RANKED_ORDER, 'adjusted')).toEqual({
+      key: 'adjusted',
+      descending: true,
+    });
+  });
+});
+
 describe('what a line reads', () => {
   it('reads a skater ice time a game, and none for a goalie', () => {
     expect(toiPerGame(skaterLine(1, 10, 70, 1380))).toBe(1380);
