@@ -10,6 +10,7 @@ import { ScoutMyTeamResponse } from '../api/models/scout-my-team-response';
 import { ScoutRosterPlayer } from '../api/models/scout-roster-player';
 import { ScoutSince } from '../api/models/scout-since';
 import { nhlTeamKey } from '../models/nhl-team';
+import { PageListing } from '../player-scout/lineup-role';
 import { Projection } from '../models/projection.model';
 import {
   GOALIE_SCORING_STAT_KEYS,
@@ -48,6 +49,8 @@ export interface ScoutPlayer {
   readonly then: Projection | null;
   /** The stats the chosen day's line gave a number for. */
   readonly thenProjected: ReadonlySet<string>;
+  /** Where today's lineup page lists him; null when no readable page gives him a role. */
+  readonly lineup: PageListing | null;
 }
 
 export interface ScoutList {
@@ -55,6 +58,8 @@ export interface ScoutList {
   readonly inSeason: boolean;
   /** Which earlier line the then-lines are, and what answered the day asked for. */
   readonly since: ScoutSince;
+  /** The day the lineup pages were read, as an ISO date; null when none could be. */
+  readonly lineupSeenOn: string | null;
   readonly players: readonly ScoutPlayer[];
 }
 
@@ -129,6 +134,7 @@ export class PlayerScoutService {
       map((answer) => ({
         inSeason: answer.inSeason,
         since: answer.since,
+        lineupSeenOn: answer.lineupSeenOn ?? null,
         players: answer.players.map(toScoutPlayer),
       })),
     );
@@ -280,5 +286,12 @@ function toScoutPlayer(row: PlayerScoutRow): ScoutPlayer {
     injuryStatus: row.injuryStatus,
     then: row.then ? projectionOf(type, playerId, row.then) : null,
     thenProjected: new Set(row.then ? Object.keys(row.then.stats) : []),
+    lineup: row.lineup
+      ? {
+          line: row.lineup.line ?? null,
+          powerPlayUnit: row.lineup.powerPlayUnit ?? null,
+          penaltyKillUnit: row.lineup.penaltyKillUnit ?? null,
+        }
+      : null,
   };
 }

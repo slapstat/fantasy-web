@@ -37,6 +37,7 @@ import {
   PLANNER_POSITIONS,
 } from '../streamer-planner/planner-free-agents';
 import { TeamRoom, teamRoom } from './drop-candidates';
+import { holdsRole, isLineupRole, LINEUP_ROLE_GROUPS, LineupRole } from './lineup-role';
 import {
   EVEN_NIGHTS,
   LineupValue,
@@ -381,6 +382,11 @@ export class PlayerScoutComponent {
   readonly showMine = signal(false);
   /** An NHL club, by the NHL's spelling, or null for every club. */
   readonly nhlTeam = signal<string | null>(null);
+  /** A line, pair or special-teams unit on today's lineup page, or null for any role. */
+  readonly lineupRole = signal<LineupRole | null>(null);
+  readonly lineupRoleGroups = LINEUP_ROLE_GROUPS;
+  /** The day the lineup pages were read; null when none could be, and the filter is off. */
+  readonly lineupSeenOn = computed(() => this.list()?.lineupSeenOn ?? null);
   readonly movers = signal<ScoutMovers>('all');
   readonly search = signal('');
 
@@ -396,6 +402,11 @@ export class PlayerScoutComponent {
   onNhlTeam(event: Event): void {
     const value = (event.target as HTMLSelectElement).value;
     this.nhlTeam.set(value || null);
+  }
+
+  onLineupRole(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.lineupRole.set(isLineupRole(value) ? value : null);
   }
 
   toggleShowMine(): void {
@@ -550,6 +561,9 @@ export class PlayerScoutComponent {
     const pool = this.pool();
     const showMine = this.showMine();
     const nhlTeam = this.nhlTeam();
+    // Pages that could not be read filter nobody out: the select is off then, but a role picked
+    // before a reload must not empty the list either.
+    const role = this.lineupSeenOn() ? this.lineupRole() : null;
     const holds = (row: ScoutRow): boolean => {
       const owner = row.scout.owner;
       switch (pool) {
@@ -570,7 +584,8 @@ export class PlayerScoutComponent {
     return this.ranked().filter(
       (row) =>
         (holds(row) || (showMine && row.scout.owner?.mine === true)) &&
-        (nhlTeam === null || nhlTeamKey(row.player.teamAbbrev) === nhlTeam),
+        (nhlTeam === null || nhlTeamKey(row.player.teamAbbrev) === nhlTeam) &&
+        (role === null || holdsRole(row.scout.lineup, role)),
     );
   });
 
@@ -1023,6 +1038,7 @@ export class PlayerScoutComponent {
       this.pool(),
       this.showMine(),
       this.nhlTeam(),
+      this.lineupRole(),
       this.positions(),
       this.movers(),
       this.search(),

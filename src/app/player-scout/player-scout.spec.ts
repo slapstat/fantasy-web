@@ -92,6 +92,7 @@ function scoutPlayer(
     owner,
     then,
     thenProjected: new Set(then ? ['goals', 'assists'] : []),
+    lineup: null,
     ...extra,
   };
 }
@@ -168,6 +169,7 @@ function league(): ScoutList {
       resolved: '2026-10-07',
       earliestSnapshot: '2026-10-08',
     },
+    lineupSeenOn: '2026-11-06',
     players: [
       ...depth,
       scoutPlayer(skater(99, 12, 40), skater(99, 4, 10), ['D']),
@@ -482,6 +484,45 @@ describe('PlayerScoutComponent', () => {
     expect(ids(page.filtered())).toEqual(['98']);
   });
 
+  it('narrows to a line, pair or special-teams unit on the lineup page today', async () => {
+    const list = league();
+    const listed: Record<string, ScoutPlayer['lineup']> = {
+      '1': { line: 'f1', powerPlayUnit: 1, penaltyKillUnit: null },
+      '2': { line: 'f2', powerPlayUnit: 1, penaltyKillUnit: 2 },
+      '99': { line: 'd1', powerPlayUnit: null, penaltyKillUnit: 2 },
+    };
+    players.mockReturnValue(
+      of({
+        ...list,
+        players: list.players.map((row) => ({
+          ...row,
+          lineup: listed[row.freeAgent.playerId] ?? null,
+        })),
+      }),
+    );
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+
+    page.lineupRole.set('f1');
+    expect(ids(page.filtered())).toEqual(['1']);
+    page.lineupRole.set('pp1');
+    expect(ids(page.filtered()).sort((a, b) => a.localeCompare(b))).toEqual(['1', '2']);
+    page.lineupRole.set('pk2');
+    expect(ids(page.filtered()).sort((a, b) => a.localeCompare(b))).toEqual(['2', '99']);
+    page.lineupRole.set('d3');
+    expect(ids(page.filtered())).toEqual([]);
+  });
+
+  it('filters nobody on a role while no lineup page could be read', async () => {
+    players.mockReturnValue(of({ ...league(), lineupSeenOn: null }));
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    const everyone = page.filtered().length;
+
+    page.lineupRole.set('f1');
+    expect(page.filtered()).toHaveLength(everyone);
+  });
+
   it('narrows the list to the positions picked, and finds a name', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
@@ -552,7 +593,9 @@ describe('PlayerScoutComponent', () => {
   });
 
   it('says the season is not under way rather than listing nobody', async () => {
-    players.mockReturnValue(of({ inSeason: false, since: { kind: 'NONE' }, players: [] }));
+    players.mockReturnValue(
+      of({ inSeason: false, since: { kind: 'NONE' }, lineupSeenOn: null, players: [] }),
+    );
     const fixture = await render();
 
     expect(ngMocks.formatText(fixture)).toContain("The season hasn't started yet.");

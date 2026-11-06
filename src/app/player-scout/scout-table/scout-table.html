@@ -230,6 +230,11 @@
                       ownerTag(entry.row)
                     }}</span>
                   }
+                  @if (lineupTag(entry.row); as listed) {
+                    <span class="scout-tag scout-tag--lineup" appTooltip="Today's lineup page">{{
+                      listed
+                    }}</span>
+                  }
                   @if (compare() && entry.row.rising) {
                     <span class="scout-tag scout-tag--rising">Rising</span>
                   } @else if (compare() && entry.row.then === null) {

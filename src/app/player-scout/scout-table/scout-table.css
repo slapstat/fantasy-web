@@ -159,6 +159,13 @@
   color: var(--color-primary-contrast);
 }
 
+.scout-tag--lineup {
+  border-color: transparent;
+  color: var(--color-text-subtle);
+  font-variant-numeric: tabular-nums;
+  padding-inline: 0;
+}
+
 .scout-tag--held {
   border-color: transparent;
   color: var(--color-text-subtle);
