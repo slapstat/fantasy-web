@@ -993,6 +993,31 @@ describe('PlayerScoutComponent', () => {
     expect(ngMocks.formatText(fixture)).toContain('1 open roster spot');
   });
 
+  it('says nothing of a player who could move to injured reserve', async () => {
+    settings = { ...SETTINGS, reserveSlots: { 'IR+': 1 } };
+    const answer = team();
+    myTeam.mockReturnValue(
+      of({
+        ...answer,
+        team: {
+          ...answer.team,
+          players: answer.team.players.map((player) =>
+            player.playerId === '203'
+              ? { ...player, out: true, injuryStatus: 'IR', reserveEligible: ['IR'] }
+              : player,
+          ),
+        },
+      }),
+    );
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+
+    expect(page.room().toReserve).toHaveLength(1);
+    expect(page.fullRoster()).toBe(false);
+    expect(ngMocks.findAll(fixture, '.room-list')).toHaveLength(0);
+    expect(ngMocks.formatText(fixture)).not.toContain('to open a spot');
+  });
+
   it('keeps a player who is out off the chips, and prices him at the nights he plays once back', async () => {
     const answer = team();
     myTeam.mockReturnValue(

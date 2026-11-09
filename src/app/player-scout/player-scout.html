@@ -167,8 +167,8 @@
                 }
                 @case ('ready') {
                   @if (!fullRoster()) {
-                    <ul class="room-list">
-                      @if (room().openSpots > 0) {
+                    @if (room().openSpots > 0) {
+                      <ul class="room-list">
                         <li class="room">
                           <app-icon name="check-circle" [size]="14" />
                           <span
@@ -176,22 +176,8 @@
                             anyone.</span
                           >
                         </li>
-                      }
-                      @for (move of room().toReserve; track move.player.playerId) {
-                        <li class="room">
-                          <app-icon name="check-circle" [size]="14" />
-                          <span>
-                            Move <strong>{{ move.player.name }}</strong>
-                            @if (move.player.injuryStatus) {
-                              <span class="drop-tag drop-tag--out">{{
-                                move.player.injuryStatus
-                              }}</span>
-                            }
-                            to {{ move.slot }} to open a spot.
-                          </span>
-                        </li>
-                      }
-                    </ul>
+                      </ul>
+                    }
                   } @else {
                     <div class="room floor">
                       <app-icon name="user-minus" [size]="14" />
