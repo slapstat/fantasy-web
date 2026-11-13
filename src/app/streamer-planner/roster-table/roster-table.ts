@@ -52,7 +52,7 @@ export interface RosterEntry {
 })
 export class RosterTableComponent {
   readonly rows = input.required<readonly RosterRow[]>();
-  /** The counted game days, in order: a column of marks each. */
+  /** The nights, in order, the dark ones too: a column of marks each. */
   readonly nights = input.required<readonly PlannerDay[]>();
   readonly scoringType = input.required<ScoringType>();
   /** The categories the league scores, in the league's order. */
