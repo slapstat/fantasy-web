@@ -123,9 +123,9 @@ describe('CompareMenuComponent', () => {
       disabled: choice.disabled,
     }));
 
-  it('reads as an invitation while no comparison is on, and as the day once one is', () => {
+  it('reads Projection Change while no comparison is on, and as the day once one is', () => {
     const { fixture } = render(false, null);
-    expect(ngMocks.formatText(button(fixture))).toBe('Compare with · an earlier day');
+    expect(ngMocks.formatText(button(fixture))).toBe('Projection Change');
     expect(button(fixture).nativeElement.classList).not.toContain('compare-btn--on');
 
     fixture.componentInstance.on = true;
@@ -142,10 +142,10 @@ describe('CompareMenuComponent', () => {
     expect(ngMocks.formatText(button(fixture))).toBe('Compare with · Preseason · before game 1');
   });
 
-  it('keeps wearing the sentence while the comparison is off, whatever day it kept', () => {
+  it('keeps reading Projection Change while the comparison is off, whatever day it kept', () => {
     const { fixture } = render(false, '2026-10-15');
 
-    expect(ngMocks.formatText(button(fixture))).toBe('Compare with · an earlier day');
+    expect(ngMocks.formatText(button(fixture))).toBe('Projection Change');
   });
 
   it('shortens to the day alone on a phone, where the chips sit beside it', () => {
@@ -159,7 +159,7 @@ describe('CompareMenuComponent', () => {
 
     fixture.componentInstance.on = false;
     fixture.detectChanges();
-    expect(ngMocks.formatText(button(fixture))).toBe('Compare with · an earlier day');
+    expect(ngMocks.formatText(button(fixture))).toBe('Projection Change');
   });
 
   it('finishes the sentence with nothing, the two relative days, the preseason, and says from when days are kept', () => {

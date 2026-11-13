@@ -110,8 +110,8 @@ export interface CompareChoice {
 }
 
 /**
- * The comparison, as one menu button that reads as a sentence: "Compare with · an earlier day"
- * in rest, "Compare with · 15 Oct · 5 days ago" with a comparison on. The menu under it finishes
+ * The comparison, as one menu button: "Projection Change" in rest (Alexander, 2026-11-13), the
+ * sentence "Compare with · 15 Oct · 5 days ago" with a comparison on. The menu under it finishes
  * the sentence: nothing, yesterday, a week ago, the day last picked, the preseason, or a day of
  * the reader's own from the platform's date picker.
  *
@@ -218,11 +218,8 @@ export class CompareMenuComponent {
     return earliest === null ? 'No day is kept yet.' : `Days are kept from ${formatDay(earliest)}.`;
   });
 
-  /** What the button says after "Compare with": the day and how long ago, or an invitation. */
+  /** What the button says after "Compare with" while a comparison is on: the day and how long ago. */
   readonly value = computed(() => {
-    if (!this.on()) {
-      return 'an earlier day';
-    }
     const since = this.since();
     return since === null
       ? 'Preseason · before game 1'
