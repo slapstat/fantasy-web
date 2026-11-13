@@ -11,6 +11,8 @@
 >
   @if (short(); as face) {
     <span class="compare-value">{{ face }}</span>
+  } @else if (!on()) {
+    <span class="compare-value">Projection Change</span>
   } @else {
     <span class="compare-lead">Compare with · </span>
     <span class="compare-value">{{ value() }}</span>
