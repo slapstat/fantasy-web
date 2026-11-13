@@ -1111,10 +1111,21 @@ export class StreamerPlannerComponent {
     );
   });
 
-  /** The counted game days, in order: the roster table's night columns. */
+  /** The counted game days, in order: the nights the lineup is set on. */
   readonly countedDays = computed(() => {
     const counted = this.counted();
     return this.days().filter((day) => counted.has(day.date));
+  });
+
+  /**
+   * The roster table's night columns: the counted game days and every night without a game, so
+   * the week reads as a week. A night without an NHL game has nothing to count, but leaving its
+   * column out made Thursday sit beside Saturday as if Friday were not in the week. A game night
+   * the reader unticked stays out: that one was left out on purpose.
+   */
+  readonly rosterDays = computed(() => {
+    const counted = this.counted();
+    return this.days().filter((day) => day.games === 0 || counted.has(day.date));
   });
 
   /**
@@ -1144,7 +1155,7 @@ export class StreamerPlannerComponent {
       starts,
       this.teamsByKey(),
       this.counted(),
-      dates,
+      this.rosterDays().map((day) => day.date),
       (lines) => this.scoreInPool(lines),
       value,
     );

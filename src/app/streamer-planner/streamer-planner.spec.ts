@@ -1215,13 +1215,26 @@ describe('StreamerPlannerComponent', () => {
           ]);
           const [benched, out, lowestStarter] = roster;
           expect(benched).toMatchObject({ rank: 1, score: 0, games: 0, clubGames: 2 });
-          expect(benched.nights.map((night) => night.status)).toEqual(['bench', 'bench']);
+          // The whole week is drawn, the nights without a game too: a dot, not a gap.
+          expect(benched.nights.map((night) => night.status)).toEqual([
+            'none',
+            'bench',
+            'none',
+            'bench',
+            'none',
+            'none',
+            'none',
+          ]);
           // Out: no night to sit, and no start, but his games are still on the schedule.
           expect(out).toMatchObject({ score: 0, games: 0, clubGames: 2 });
-          expect(out.nights.map((night) => night.status)).toEqual(['none', 'none']);
+          expect(out.nights.every((night) => night.status === 'none')).toBe(true);
           // The third C starts both nights, in the Util spot: a goal at 3 apiece.
           expect(lowestStarter).toMatchObject({ score: 3, games: 2, clubGames: 2 });
-          expect(lowestStarter.nights.map((night) => night.status)).toEqual(['start', 'start']);
+          expect(
+            lowestStarter.nights
+              .filter((night) => night.status !== 'none')
+              .map((night) => night.status),
+          ).toEqual(['start', 'start']);
           expect(planner.unprojected()).toBe(0);
 
           planner.setView('roster');
@@ -1229,7 +1242,15 @@ describe('StreamerPlannerComponent', () => {
           expect(ngMocks.findAll(fixture, '.roster-note')).toHaveLength(0);
           const table = ngMocks.findInstance(RosterTableComponent);
           expect(table.rows().map((row) => row.player.name)[0]).toBe('Mine 16');
-          expect(table.nights().map((day) => day.date)).toEqual(['2026-10-13', '2026-10-15']);
+          expect(table.nights().map((day) => day.date)).toEqual([
+            '2026-10-12',
+            '2026-10-13',
+            '2026-10-14',
+            '2026-10-15',
+            '2026-10-16',
+            '2026-10-17',
+            '2026-10-18',
+          ]);
         });
 
         // Measured from the pool's average week, a player benched both nights scored below a
@@ -1254,14 +1275,22 @@ describe('StreamerPlannerComponent', () => {
           expect(byName.get('Mine 10')!.score).toBeCloseTo(3 * thin.score, 10);
         });
 
-        it('follows the nights counted: with a night unticked, the bench shrinks to the other', async () => {
+        it('follows the nights counted: a game night unticked leaves the table, the dark ones stay', async () => {
           const fixture = await render();
           const planner = fixture.point.componentInstance;
           planner.toggleDay(planner.days()[1]);
 
           const benched = planner.roster()[0];
           expect(benched.player.name).toBe('Mine 16');
-          expect(benched.nights.map((night) => night.date)).toEqual(['2026-10-15']);
+          expect(benched.nights.map((night) => night.date)).toEqual([
+            '2026-10-12',
+            '2026-10-14',
+            '2026-10-15',
+            '2026-10-16',
+            '2026-10-17',
+            '2026-10-18',
+          ]);
+          expect(benched.nights.filter((night) => night.status === 'bench')).toHaveLength(1);
           expect(benched.clubGames).toBe(1);
         });
 

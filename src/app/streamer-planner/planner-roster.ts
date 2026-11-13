@@ -171,7 +171,7 @@ export interface RosterRow extends LineRow {
   readonly games: number;
   /** The games he is expected to play on the nights counted, started or not. */
   readonly clubGames: number;
-  /** Each counted game day, in order. */
+  /** Each night marked, in order: the counted game days and the nights without a game. */
   readonly nights: readonly RosterNight[];
 }
 
@@ -182,7 +182,7 @@ export interface RosterRow extends LineRow {
  * his week would have been: he is the one to drop for a streamer.
  *
  * @param starts the nights each player starts ({@link lineupStarts})
- * @param dates the counted game days, in order
+ * @param dates the nights to mark, in order: the counted game days and the nights without a game
  * @param score each line's score, in the order the lines are given
  * @param value what a game of each player is worth, which parts players level on the score
  */
