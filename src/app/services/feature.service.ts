@@ -65,6 +65,13 @@ export class FeatureService {
   readonly playerScout = computed(() =>
     this.features.hasValue() ? this.features.value().playerScout : false,
   );
+  /**
+   * Whether Player Scout may offer its Position-adjusted ranking. False until the answer lands, like
+   * the others, and whenever Player Scout itself is not served.
+   */
+  readonly playerScoutPositionAdjusted = computed(() =>
+    this.features.hasValue() ? this.features.value().playerScoutPositionAdjusted : false,
+  );
   /** Whether Role Changes is served here. False until the answer lands, like the others. */
   readonly roleChanges = computed(() =>
     this.features.hasValue() ? this.features.value().roleChanges : false,

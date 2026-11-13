@@ -434,17 +434,20 @@
             </div>
           }
           <!-- How the list is ranked: by the score, or by the score over the best player at each
-               position the league leaves unstarted, which is what a spot in its lineup is worth. -->
-          <button
-            type="button"
-            class="pill adjust-toggle"
-            [class.pill--active]="positionAdjusted()"
-            [attr.aria-pressed]="positionAdjusted()"
-            appTooltip="Value over the best unstarted player at his position"
-            (click)="togglePositionAdjusted()"
-          >
-            Position-adjusted
-          </button>
+               position the league leaves unstarted, which is what a spot in its lineup is worth.
+               Offered only where the BFF's playerScoutPositionAdjusted says so. -->
+          @if (positionAdjustedOffered()) {
+            <button
+              type="button"
+              class="pill adjust-toggle"
+              [class.pill--active]="positionAdjusted()"
+              [attr.aria-pressed]="positionAdjusted()"
+              appTooltip="Value over the best unstarted player at his position"
+              (click)="togglePositionAdjusted()"
+            >
+              Position-adjusted
+            </button>
+          }
           @if (compare()) {
             @if (sinceCaption(); as caption) {
               <p class="caption" aria-live="polite">{{ caption }}</p>

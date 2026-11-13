@@ -17,6 +17,7 @@ import { isAllSkaters } from '../models/position.model';
 import { ScoringStatKey } from '../models/stat-key.model';
 import { STAT_FULL_NAMES } from '../pipes/stat-tooltip.pipe';
 import { EspnService } from '../services/espn.service';
+import { FeatureService } from '../services/feature.service';
 import { ChosenLeague, LeagueChoiceService } from '../services/league-choice.service';
 import { PlayerScoutService, ScoutSince, TeamPlayer } from '../services/player-scout.service';
 import { ProjectionRankingService, ScoreUnits } from '../services/projection-ranking.service';
@@ -160,6 +161,7 @@ export class PlayerScoutComponent {
   private readonly ranking = inject(ProjectionRankingService);
   private readonly yahoo = inject(YahooService);
   private readonly espn = inject(EspnService);
+  private readonly features = inject(FeatureService);
 
   constructor() {
     this.picker.start();
@@ -504,9 +506,17 @@ export class PlayerScoutComponent {
   /**
    * Ranked position-adjusted: each player by his score over the best player at his position a
    * league this size leaves without a starting spot, so a defenceman who scores as a winger does
-   * comes first where defencemen are scarcer. Off, the list is ranked by the score.
+   * comes first where defencemen are scarcer. Off, the list is ranked by the score. Never on
+   * where the BFF does not offer it (`playerScoutPositionAdjusted`), whatever was pressed.
    */
-  readonly positionAdjusted = signal(false);
+  readonly positionAdjusted = computed(
+    () => this.positionAdjustedOffered() && this.positionAdjustedPicked(),
+  );
+
+  /** Whether the Position-adjusted ranking is offered here at all, which the BFF decides. */
+  readonly positionAdjustedOffered = this.features.playerScoutPositionAdjusted;
+
+  private readonly positionAdjustedPicked = signal(false);
 
   /**
    * On, the list opens in its new ranked order, which the Adjusted heading wears; any other order
@@ -514,7 +524,7 @@ export class PlayerScoutComponent {
    */
   togglePositionAdjusted(): void {
     const on = !this.positionAdjusted();
-    this.positionAdjusted.set(on);
+    this.positionAdjustedPicked.set(on);
     const sort = this.sortPicked();
     if (on && sort.key === SCOUT_RANKED_ORDER.key && sort.descending) {
       this.sortPicked.set(SCOUT_ADJUSTED_ORDER);

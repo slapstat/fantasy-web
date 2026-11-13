@@ -6,6 +6,7 @@ import { LeagueProjectionSettingsResponse } from '../api/models/league-projectio
 import { Projection } from '../models/projection.model';
 import { GOALIE_SCORING_STAT_KEYS } from '../models/stat-key.model';
 import { EspnService } from '../services/espn.service';
+import { FeatureService } from '../services/feature.service';
 import { ChosenLeague, LeagueChoiceService } from '../services/league-choice.service';
 import {
   PlayerScoutService,
@@ -189,8 +190,10 @@ describe('PlayerScoutComponent', () => {
   let players: ReturnType<typeof vi.fn<(...args: unknown[]) => Observable<ScoutList>>>;
   let myTeam: ReturnType<typeof vi.fn<() => Observable<ScoutTeamAnswer>>>;
   let settings: LeagueProjectionSettingsResponse;
+  let positionAdjustedOffered: boolean;
 
   beforeEach(() => {
+    positionAdjustedOffered = true;
     localStorage.removeItem(STREAMERS_KEY);
     chosen = LEAGUE;
     settings = SETTINGS;
@@ -219,7 +222,10 @@ describe('PlayerScoutComponent', () => {
             ],
           }),
       } as never)
-      .mock(EspnService, { leagueProjectionSettings: () => of(SETTINGS) });
+      .mock(EspnService, { leagueProjectionSettings: () => of(SETTINGS) })
+      .mock(FeatureService, {
+        playerScoutPositionAdjusted: () => positionAdjustedOffered,
+      } as never);
   });
 
   async function render() {
@@ -331,6 +337,21 @@ describe('PlayerScoutComponent', () => {
     expect(ids(page.ranked()).slice(0, 3)).toEqual(['201', '301', '99']);
     // Its column gone, the order falls back to the ranked one.
     expect(page.sort()).toEqual({ key: 'score', descending: true });
+  });
+
+  it('offers no Position-adjusted ranking where the BFF does not, and ranks by the score', async () => {
+    positionAdjustedOffered = false;
+    settings = { ...SETTINGS, leagueSize: 1 };
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+
+    expect(ngMocks.findAll(fixture, '.adjust-toggle')).toHaveLength(0);
+    page.togglePositionAdjusted();
+    fixture.detectChanges();
+
+    expect(page.positionAdjusted()).toBe(false);
+    expect(ids(page.ranked()).slice(0, 3)).toEqual(['201', '301', '99']);
+    expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'adjusted')).toBe(false);
   });
 
   it('switches the comparison on against the preseason, then a day, and reads again for the day', async () => {
