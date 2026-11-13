@@ -231,9 +231,7 @@
                     }}</span>
                   }
                   @if (lineupTag(entry.row); as listed) {
-                    <span class="scout-tag scout-tag--lineup" appTooltip="Today's lineup page">{{
-                      listed
-                    }}</span>
+                    <span class="scout-tag scout-tag--lineup">{{ listed }}</span>
                   }
                   @if (compare() && entry.row.rising) {
                     <span class="scout-tag scout-tag--rising">Rising</span>
