@@ -151,6 +151,40 @@ for (const [where, most, instead] of table(markdown, 'Length')) {
   });
 }
 
+// A build leaves `[[copy: what this text has to do]]` wherever a reader will see text, and the
+// words are written afterwards in a pass of their own (COPY-RULES.md, *Placeholders*). Copy written
+// as a side effect of building a component got no attention and was rewritten by hand, string by
+// string, after it shipped. A placeholder is a promise of that pass, so none may merge: this is
+// not ratcheted, and `--update` cannot baseline one. Templates and component code alike, since a
+// string a component returns is read as much as one in a template.
+const PLACEHOLDER = /\[\[copy:[^\]]*\]\]/g;
+const GENERATED = 'src/app/api/';
+
+function sources(dir) {
+  return readdirSync(dir).flatMap((entry) => {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) return sources(path);
+    return /\.(html|ts)$/.test(path) && !path.endsWith('.spec.ts') ? [path] : [];
+  });
+}
+
+const placeholders = sources(join(ROOT, 'src')).flatMap((path) => {
+  const file = relative(ROOT, path).split(sep).join('/');
+  if (file.startsWith(GENERATED)) return [];
+  return readFileSync(path, 'utf8')
+    .split('\n')
+    .flatMap((line, i) => [...line.matchAll(PLACEHOLDER)].map((m) => `${file}:${i + 1}  ${m[0]}`));
+});
+
+if (placeholders.length) {
+  console.error(
+    `::error::${placeholders.length} copy placeholder(s) still waiting for their text:`,
+  );
+  for (const where of placeholders) console.error(`  ${where}`);
+  console.error('Write them in one copy pass (the slapstat-copy skill), then run this again.');
+  process.exit(1);
+}
+
 const ESCAPE = /[.*+?^${}()|[\]\\]/g;
 
 const found = {};
