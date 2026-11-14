@@ -91,10 +91,22 @@ text is written to be complete.
 | tooltip | 60 characters | cut it, or rename the label so it needs none |
 | text block | 120 characters | one short sentence, or cut it |
 
+## Placeholders
+
+A build writes no copy. Wherever a reader will see text, it leaves a placeholder saying what the
+text has to do, and the words are written afterwards, all together, in a copy pass of their own:
+
+```
+[[copy: button that saves the league's scoring settings]]
+```
+
+The check fails on any placeholder left in `src/` (templates and `.ts`, specs and the generated
+client excepted), and no baseline can absorb one, so none merges.
+
 ## Scope
 
-The check scans Angular templates (`src/app/**/*.html`) only. TypeScript strings are reviewed by
-the `copy-check` skill.
+The rules above scan Angular templates (`src/app/**/*.html`) only. TypeScript strings are reviewed
+by the `copy-check` skill. Placeholders are the exception: they are found in `.ts` files too.
 
 ## Baseline
 

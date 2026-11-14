@@ -637,6 +637,12 @@ every unasked one has been rewritten or deleted by hand.
 - Never explain what the user can see, or restate a feature's benefit.
 - What text there is: a tooltip at most 60 characters and one sentence; any visible text block
   at most 120. `check:copy` fails a PR over either (`COPY-RULES.md`, *Length*).
+- **Build with placeholders, write the copy in its own pass.** While building, every string a
+  reader will see is `[[copy: what it has to do]]`, never draft wording. Once the feature works,
+  write all of them at once in a copy pass held to the `slapstat-copy` skill, and list every string
+  (where, then the text) under a `## Copy` heading in the PR body, so Alexander reads the change's
+  copy in one place. `check:copy` fails while any placeholder is left (`COPY-RULES.md`,
+  *Placeholders*).
 
 ## Conventions
 
