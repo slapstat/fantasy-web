@@ -3,7 +3,7 @@
 <!-- impeccable:product-schema 1 -->
 
 The durable product record for design work on SlapStat's web app. It holds what the product is
-and who it is for, not how it looks: the visual system belongs in `DESIGN.md` (not written yet),
+and who it is for, not how it looks: the visual system belongs in `DESIGN.md`,
 the reasons behind past choices in `DECISIONS.md`, and how the code works in `CLAUDE.md`.
 
 ## Platform
@@ -81,15 +81,20 @@ will be a smaller part later: the product is the set of tools, not the model.
 Surfaces, by route:
 
 - **Projections** (`/projections`, `/projections/new`, `/projections/:id`): a projection is
-  created from a preset (including the AI projection), the user's own work, a shared board or a
+  created from a preset (including the AI projection, over the whole season or, once a season
+  is under way, only the games left to play), the user's own work, a shared board or a
   spreadsheet, then edited in a wide player table. League settings imported from a league are
   locked to it; **Disconnect league** is the way out.
 - **Draft Mode** (`/draft`, `/drafts/:id`): a board drafted against any source, any number of
   times, optionally following the league's live Yahoo draft; a summary ranks the teams after.
 - **In-season tools**: Streamer Planner (`/streamer-planner`, with the user's own open spots and
   a pickup priced against a drop), Who's Hot (`/whos-hot`), Team Power Rankings
-  (`/team-power-rankings`), FA Scout (`/fa-scout`), Role Changes (`/role-changes`) and Draft
-  Analysis (`/draft-analysis`).
+  (`/team-power-rankings`), Player Scout (`/player-scout`: today's AI projection against an
+  earlier day's, with a drop recommendation weighed against the user's roster; it replaced FA
+  Scout, and `/fa-scout` redirects to it), Role Changes (`/role-changes`: skaters whose ice time
+  or power-play share at their club has moved), Start/Bench (`/start-bench`: the user's roster
+  on a given day with the best lineup by the AI projection) and Draft Analysis
+  (`/draft-analysis`).
 - **Sharing** (`/s/:token`): a frozen snapshot of the published rows, opened without sign-in,
   followed (read-only mirror) or copied.
 - **Account**: sign-in by email or Google (Facebook behind a build flag); `/profile` (picture and the public name a
