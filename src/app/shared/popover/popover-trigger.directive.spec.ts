@@ -9,11 +9,17 @@ import { OpenPopovers } from './open-popovers';
   template: `
     <button id="labelled" [appPopover]="menu">League setup</button>
     <button id="icon-only" aria-label="Column settings for Goals" [appPopover]="menu"></button>
+    <button id="renamed" popoverLabel="Compare with" [appPopover]="menu">15 Oct</button>
+    <button id="chosen" [appPopover]="choices">Pick one</button>
     <button id="elsewhere">Elsewhere</button>
     <ng-template #menu>
       <button id="menu-item">Hide column</button>
       <input id="decimals" type="number" />
       <input id="search" type="search" />
+    </ng-template>
+    <ng-template #choices>
+      <button id="first-choice">First</button>
+      <button id="made-choice" data-popover-initial-focus>Second</button>
     </ng-template>
   `,
 })
@@ -138,5 +144,19 @@ describe('PopoverTriggerDirective and OpenPopovers', () => {
     button('labelled').click();
 
     expect(panel()?.getAttribute('aria-label')).toEqual('League setup');
+  });
+
+  it('names the panel as told to, where the trigger text is only the value picked', () => {
+    const { button } = setup();
+    button('renamed').click();
+
+    expect(panel()?.getAttribute('aria-label')).toEqual('Compare with');
+  });
+
+  it('opens on the control marked as the choice already made, not the first one', () => {
+    const { button } = setup();
+    button('chosen').click();
+
+    expect(document.activeElement?.id).toEqual('made-choice');
   });
 });

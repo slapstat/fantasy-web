@@ -107,7 +107,7 @@ describe('CompareMenuComponent', () => {
 
   type Fixture = ReturnType<typeof render>['fixture'];
   const button = (fixture: Fixture) => ngMocks.find(fixture, '.compare-btn');
-  const field = (fixture: Fixture) => ngMocks.find(fixture, 'input[type=date]');
+  const field = (fixture: Fixture) => ngMocks.find(fixture, 'input.day-field');
   const panel = () => document.querySelector<HTMLElement>('.app-popover-panel');
   const open = (fixture: Fixture) => {
     ngMocks.click(button(fixture));
@@ -120,8 +120,22 @@ describe('CompareMenuComponent', () => {
       label: choice.querySelector('.choice-label')!.textContent.trim(),
       note: choice.querySelector('.choice-note')!.textContent.trim(),
       picked: choice.getAttribute('aria-checked') === 'true',
-      disabled: choice.disabled,
     }));
+  const press = (target: HTMLElement, key: string) =>
+    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+  const focused = () => document.activeElement?.querySelector('.choice-label')?.textContent.trim();
+  /** A browser that will not open a picker: "Pick a day" becomes the menu's own field. */
+  const typedField = async (fixture: Fixture) => {
+    const input = field(fixture).nativeElement as HTMLInputElement;
+    input.showPicker = vi.fn(() => {
+      throw new DOMException('no activation', 'NotAllowedError');
+    });
+    const menu = open(fixture);
+    menu.querySelector<HTMLButtonElement>('.pick-day')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    return { menu, typed: menu.querySelector<HTMLInputElement>('input.day-input')! };
+  };
 
   it('reads Projection Change while no comparison is on, and as the day once one is', () => {
     const { fixture } = render(false, null);
@@ -162,8 +176,8 @@ describe('CompareMenuComponent', () => {
     expect(ngMocks.formatText(button(fixture))).toBe('Projection Change');
   });
 
-  it('finishes the sentence with nothing, the two relative days, the preseason, and says from when days are kept', () => {
-    const { fixture } = render(false, null);
+  it('finishes the sentence with nothing, each relative day there is a projection for, and the preseason', () => {
+    const { fixture } = render(false, null, '2026-10-10');
 
     const menu = open(fixture);
 
@@ -171,44 +185,64 @@ describe('CompareMenuComponent', () => {
       "Compare today's projection with",
     );
     expect(lines(menu)).toEqual([
-      { label: 'Nothing', note: 'today only', picked: true, disabled: false },
-      { label: 'Yesterday', note: '19 Oct', picked: false, disabled: false },
-      { label: 'A week ago', note: '13 Oct, not kept', picked: false, disabled: true },
-      { label: 'Preseason', note: 'before game 1', picked: false, disabled: false },
+      { label: 'Nothing', note: 'today only', picked: true },
+      { label: 'Yesterday', note: '19 Oct', picked: false },
+      { label: 'A week ago', note: '13 Oct', picked: false },
+      { label: 'Preseason', note: 'before game 1', picked: false },
     ]);
-    expect(menu.querySelector('.menu-foot')!.textContent.trim()).toBe('Days are kept from 14 Oct.');
-    expect(menu.querySelector<HTMLButtonElement>('.pick-day')!.disabled).toBe(false);
+    expect(menu.querySelector('.pick-day')).not.toBeNull();
+  });
+
+  it('leaves out a day before the first on record, and says nothing about what is stored', () => {
+    const { fixture } = render(false, null);
+
+    const menu = open(fixture);
+
+    expect(lines(menu).map((line) => line.label)).toEqual(['Nothing', 'Yesterday', 'Preseason']);
+    expect(choices(menu).some((choice) => choice.disabled)).toBe(false);
+    expect(menu.textContent).not.toContain('kept');
+  });
+
+  it('names the panel as the sentence the menu finishes, not as the day on the button', () => {
+    const { fixture } = render(true, '2026-10-15');
+
+    expect(open(fixture).getAttribute('aria-label')).toBe("Compare today's projection with");
   });
 
   it('keeps the day last picked as a line of its own, in its place among the days, and marks it', () => {
     const { fixture } = render(true, '2026-10-15', '2026-10-10');
 
     expect(lines(open(fixture))).toEqual([
-      { label: 'Nothing', note: 'today only', picked: false, disabled: false },
-      { label: 'Yesterday', note: '19 Oct', picked: false, disabled: false },
-      { label: '15 Oct', note: '5 days ago', picked: true, disabled: false },
-      { label: 'A week ago', note: '13 Oct', picked: false, disabled: false },
-      { label: 'Preseason', note: 'before game 1', picked: false, disabled: false },
+      { label: 'Nothing', note: 'today only', picked: false },
+      { label: 'Yesterday', note: '19 Oct', picked: false },
+      { label: '5 days ago', note: '15 Oct', picked: true },
+      { label: 'A week ago', note: '13 Oct', picked: false },
+      { label: 'Preseason', note: 'before game 1', picked: false },
     ]);
+  });
+
+  it('keeps the day picked as a line even once it falls before the first on record', () => {
+    const { fixture } = render(true, '2026-10-12');
+
+    expect(lines(open(fixture))).toContainEqual({
+      label: '8 days ago',
+      note: '12 Oct',
+      picked: true,
+    });
   });
 
   it('marks the relative day as the pick, rather than listing the same day twice', () => {
     const { fixture } = render(true, '2026-10-19');
 
     const all = lines(open(fixture));
-    expect(all.map((line) => line.label)).toEqual([
-      'Nothing',
-      'Yesterday',
-      'A week ago',
-      'Preseason',
-    ]);
+    expect(all.map((line) => line.label)).toEqual(['Nothing', 'Yesterday', 'Preseason']);
     expect(all[1].picked).toBe(true);
   });
 
   it('marks the preseason as the pick once the comparison is on with no day', () => {
     const { fixture } = render(true, null);
 
-    expect(lines(open(fixture)).map((line) => line.picked)).toEqual([false, false, false, true]);
+    expect(lines(open(fixture)).map((line) => line.picked)).toEqual([false, false, true]);
   });
 
   it('switches on against a day, or the preseason, and off for nothing, closing the menu each time', () => {
@@ -216,19 +250,51 @@ describe('CompareMenuComponent', () => {
 
     choices(open(fixture))[1].click();
     expect(panel()).toBeNull();
-    choices(open(fixture))[3].click();
+    choices(open(fixture))[2].click();
     choices(open(fixture))[0].click();
 
     expect(sinceChange.mock.calls).toEqual([['2026-10-19'], [null]]);
     expect(cleared).toHaveBeenCalledTimes(1);
   });
 
-  it('refuses a day nothing is kept for', () => {
-    const { fixture, sinceChange } = render(false, null);
+  it('is one radio group with one tab stop, which is the line picked, and opens on it', () => {
+    const { fixture } = render(true, '2026-10-19');
 
-    choices(open(fixture))[2].click();
+    const menu = open(fixture);
+    const group = menu.querySelector('[role="radiogroup"]')!;
 
+    expect(choices(menu).map((choice) => choice.getAttribute('tabindex'))).toEqual([
+      '-1',
+      '0',
+      '-1',
+    ]);
+    expect(focused()).toBe('Yesterday');
+    // "Pick a day" is not one of the answers.
+    expect(group.querySelector('.pick-day')).toBeNull();
+    expect(group.getAttribute('aria-labelledby')).toBe('compare-menu-title');
+  });
+
+  it('walks the lines with the arrows, round the ends, and reaches them with Home and End, picking nothing', () => {
+    const { fixture, sinceChange, cleared } = render(false, null);
+
+    const all = choices(open(fixture));
+    expect(focused()).toBe('Nothing');
+
+    press(all[0], 'ArrowDown');
+    expect(focused()).toBe('Yesterday');
+    press(all[1], 'ArrowUp');
+    press(all[0], 'ArrowUp');
+    expect(focused()).toBe('Preseason');
+    press(all[2], 'ArrowDown');
+    expect(focused()).toBe('Nothing');
+    press(all[0], 'End');
+    expect(focused()).toBe('Preseason');
+    press(all[2], 'Home');
+    expect(focused()).toBe('Nothing');
+
+    expect(panel()).not.toBeNull();
     expect(sinceChange).not.toHaveBeenCalled();
+    expect(cleared).not.toHaveBeenCalled();
   });
 
   it('opens the platform picker from "Pick a day" and changes nothing until a day is picked in it', () => {
@@ -251,29 +317,80 @@ describe('CompareMenuComponent', () => {
     expect(sinceChange).toHaveBeenCalledExactlyOnceWith('2026-10-16');
   });
 
-  it('offers no day before the first kept nor later than yesterday, and ignores one typed outside', () => {
-    const { fixture, sinceChange } = render(true, '2026-10-15');
+  it('offers no day before the first on record nor later than yesterday', () => {
+    const { fixture } = render(true, '2026-10-15');
     const input = field(fixture).nativeElement as HTMLInputElement;
 
     expect(input.min).toBe('2026-10-14');
     expect(input.max).toBe('2026-10-19');
-    input.value = '2026-10-12';
-    input.dispatchEvent(new Event('change'));
+  });
 
+  it('turns "Pick a day" into a named field in the menu where the browser will not show a picker', async () => {
+    const { fixture, sinceChange } = render(true, '2026-10-15');
+    const hidden = field(fixture).nativeElement as HTMLInputElement;
+    const hiddenFocus = vi.spyOn(hidden, 'focus');
+
+    const { menu, typed } = await typedField(fixture);
+
+    // The menu stays, and focus is on a field that can be seen and is named: never on the hidden
+    // one, which is off the accessibility tree.
+    expect(panel()).not.toBeNull();
+    expect(menu.querySelector('.pick-day')).toBeNull();
+    expect(typed.closest('label')!.textContent.trim()).toBe('Day');
+    expect(document.activeElement).toBe(typed);
+    expect(hiddenFocus).not.toHaveBeenCalled();
+    expect(typed.min).toBe('2026-10-14');
+    expect(typed.max).toBe('2026-10-19');
+    expect(menu.querySelector('.range-note')!.textContent.trim()).toBe(
+      'Pick a day from 14 Oct to 19 Oct.',
+    );
     expect(sinceChange).not.toHaveBeenCalled();
   });
 
-  it('falls back to the field itself where the browser will not show a picker', () => {
-    const { fixture } = render(true, '2026-10-15');
+  it('takes a day typed into that field and closes the menu', async () => {
+    const { fixture, sinceChange } = render(true, '2026-10-15');
+    const { typed } = await typedField(fixture);
+
+    typed.value = '2026-10-17';
+    typed.dispatchEvent(new Event('change'));
+
+    expect(sinceChange).toHaveBeenCalledExactlyOnceWith('2026-10-17');
+    expect(panel()).toBeNull();
+  });
+
+  it('says so when the day typed is outside the days on record, and keeps the menu open', async () => {
+    const { fixture, sinceChange } = render(true, '2026-10-15');
+    const { menu, typed } = await typedField(fixture);
+
+    typed.value = '2026-10-12';
+    typed.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(sinceChange).not.toHaveBeenCalled();
+    expect(panel()).not.toBeNull();
+    expect(typed.getAttribute('aria-invalid')).toBe('true');
+    expect(typed.getAttribute('aria-describedby')).toBe('compare-menu-range');
+    expect(menu.querySelector('.range-note')!.classList).toContain('range-note--outside');
+
+    typed.value = '2026-10-16';
+    typed.dispatchEvent(new Event('change'));
+
+    expect(sinceChange).toHaveBeenCalledExactlyOnceWith('2026-10-16');
+  });
+
+  it('brings the menu back with the days there are when the picker hands over a day outside them', async () => {
+    const { fixture, sinceChange } = render(true, '2026-10-15');
     const input = field(fixture).nativeElement as HTMLInputElement;
-    input.showPicker = vi.fn(() => {
-      throw new DOMException('no activation', 'NotAllowedError');
-    });
-    const focus = vi.spyOn(input, 'focus');
 
-    open(fixture).querySelector<HTMLButtonElement>('.pick-day')!.click();
+    input.value = '2026-10-12';
+    input.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    await fixture.whenStable();
 
-    expect(focus).toHaveBeenCalledTimes(1);
+    expect(sinceChange).not.toHaveBeenCalled();
+    const note = panel()!.querySelector('.range-note')!;
+    expect(note.textContent.trim()).toBe('Pick a day from 14 Oct to 19 Oct.');
+    expect(note.classList).toContain('range-note--outside');
   });
 
   it('keeps the day field out of the tab order and off the accessibility tree', () => {
@@ -283,14 +400,14 @@ describe('CompareMenuComponent', () => {
     expect(field(fixture).attributes['aria-hidden']).toBe('true');
   });
 
-  it('offers no day at all while none is kept, and says so', () => {
+  it('offers nothing and the preseason alone while there is no day on record', () => {
     const { fixture } = render(false, null, null);
 
     const menu = open(fixture);
 
-    expect(lines(menu).map((line) => line.disabled)).toEqual([false, true, true, false]);
-    expect(menu.querySelector<HTMLButtonElement>('.pick-day')!.disabled).toBe(true);
-    expect(menu.querySelector('.menu-foot')!.textContent.trim()).toBe('No day is kept yet.');
+    expect(lines(menu).map((line) => line.label)).toEqual(['Nothing', 'Preseason']);
+    expect(menu.querySelector('.pick-day')).toBeNull();
+    expect(menu.querySelector('.divider')).toBeNull();
     expect(field(fixture).attributes['min']).toBe('2026-10-01');
   });
 });

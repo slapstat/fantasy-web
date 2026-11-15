@@ -28,6 +28,8 @@ import { OpenPopovers } from './open-popovers';
 const FOCUSABLE_SELECTOR =
   'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
+const INITIAL_FOCUS_SELECTOR = '[data-popover-initial-focus]:not([disabled])';
+
 // A field that holds a value, as opposed to one that filters a list: a search box keeps its menu
 // open on Enter, because the list under it is what the user came for.
 const VALUE_FIELD_SELECTOR = 'input[type="number"], input[type="text"], input:not([type])';
@@ -65,6 +67,11 @@ export class PopoverTriggerDirective {
   readonly popoverAlign = input<'start' | 'end'>('end');
   /** Lets one declared template serve every column, parameterised by the column it opened for. */
   readonly popoverContext = input<Record<string, unknown> | undefined>(undefined);
+  /**
+   * What a screen reader calls the panel, where the trigger's own words do not say it: a trigger
+   * whose text is the value picked ("15 Oct") names nothing. Unset, the trigger names the panel.
+   */
+  readonly popoverLabel = input<string | undefined>(undefined);
 
   readonly isOpen = signal(false);
   private overlayRef: OverlayRef | null = null;
@@ -106,12 +113,19 @@ export class PopoverTriggerDirective {
     // aria-label is the only thing saying which column it belongs to.
     panel.setAttribute(
       'aria-label',
-      this.host.nativeElement.textContent?.trim() ||
+      this.popoverLabel() ||
+        this.host.nativeElement.textContent?.trim() ||
         this.host.nativeElement.getAttribute('aria-label') ||
         'Menu',
     );
     panel.setAttribute('tabindex', '-1');
-    (panel.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ?? panel).focus();
+    // A menu of one choice among several opens on the choice already made, as a native radio
+    // group does: it marks that control itself, and the first control is the fallback.
+    (
+      panel.querySelector<HTMLElement>(INITIAL_FOCUS_SELECTOR) ??
+      panel.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ??
+      panel
+    ).focus();
 
     // Non-modal, so tabbing past the last control should leave rather than cycle — but a menu left
     // hanging open behind the focus is clutter, so it closes itself on the way out. A null
