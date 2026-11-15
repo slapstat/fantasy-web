@@ -8,6 +8,7 @@
   [class.compare-btn--on]="on()"
   [appPopover]="compareMenu"
   popoverAlign="start"
+  popoverLabel="Compare today's projection with"
 >
   @if (short(); as face) {
     <span class="compare-value">{{ face }}</span>
@@ -31,28 +32,67 @@
   (change)="onDate($event)"
 />
 
+<!-- One radio group, entered and left with one Tab: the arrows move between its lines, and the
+     menu opens on the line picked. "Pick a day" is not one of the answers, so it sits under the
+     group, not in it. -->
 <ng-template #compareMenu>
-  <div class="menu" role="radiogroup" aria-labelledby="compare-menu-title">
+  <div class="menu">
     <p id="compare-menu-title" class="menu-title">Compare today's projection with</p>
-    @for (choice of choices(); track choice.key) {
-      <button
-        type="button"
-        class="choice"
-        role="radio"
-        [attr.aria-checked]="choice.picked"
-        [disabled]="!choice.kept"
-        (click)="pick(choice, menu)"
-      >
-        <span class="dot"></span>
-        <span class="choice-label">{{ choice.label }}</span>
-        <span class="choice-note">{{ choice.note }}</span>
-      </button>
+    <div
+      class="choices"
+      role="radiogroup"
+      aria-labelledby="compare-menu-title"
+      (keydown)="onArrow($event)"
+    >
+      @for (choice of choices(); track choice.key) {
+        <button
+          type="button"
+          class="choice"
+          role="radio"
+          [attr.aria-checked]="choice.picked"
+          [attr.tabindex]="choice.picked ? 0 : -1"
+          [attr.data-popover-initial-focus]="choice.picked ? '' : null"
+          (click)="pick(choice, menu)"
+        >
+          <span class="dot"></span>
+          <span class="choice-label">{{ choice.label }}</span>
+          <span class="choice-note">{{ choice.note }}</span>
+        </button>
+      }
+    </div>
+    @if (!noDayYet()) {
+      <div class="divider" role="presentation"></div>
+      @if (typing()) {
+        <!-- Where the browser shows no picker of its own: a field to type the day into, in the
+             menu, where it can be seen and is named. -->
+        <label class="day-row">
+          <span class="day-row-label">Day</span>
+          <input
+            #typed
+            class="day-input"
+            type="date"
+            aria-describedby="compare-menu-range"
+            [attr.aria-invalid]="outside() ? 'true' : null"
+            [min]="earliest()"
+            [max]="latest()"
+            [value]="since() ?? ''"
+            (change)="onTyped($event, menu)"
+          />
+        </label>
+        <p
+          id="compare-menu-range"
+          class="range-note"
+          [class.range-note--outside]="outside()"
+          aria-live="polite"
+        >
+          {{ range() }}
+        </p>
+      } @else {
+        <button type="button" class="pick-day" (click)="pickDay(menu)">
+          <app-icon name="calendar-days" [size]="16" />
+          Pick a day
+        </button>
+      }
     }
-    <div class="divider" role="presentation"></div>
-    <button type="button" class="pick-day" [disabled]="noDayYet()" (click)="pickDay(menu)">
-      <app-icon name="calendar-days" [size]="16" />
-      Pick a day
-    </button>
-    <p class="menu-foot">{{ footer() }}</p>
   </div>
 </ng-template>

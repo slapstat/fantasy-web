@@ -86,8 +86,8 @@
    title and the lines are drawn as the editor's Stats and Ranking menus draw theirs. */
 .menu {
   max-width: 92vw;
-  padding: 0.4rem 0.25rem 0.5rem;
-  width: 19rem;
+  padding: 0.5rem 0.25rem 0.6rem;
+  width: 20rem;
 }
 
 .menu-title {
@@ -118,8 +118,8 @@
   width: 100%;
 }
 
-.choice:hover:not(:disabled),
-.pick-day:hover:not(:disabled) {
+.choice:hover,
+.pick-day:hover {
   background: var(--color-surface-hover);
 }
 
@@ -150,17 +150,6 @@
   box-shadow: inset 0 0 0 2.5px var(--color-surface);
 }
 
-/* A day nothing is kept for: shown, with the reason beside it, rather than quietly answered by
-   the preseason line. */
-.choice:disabled {
-  color: var(--color-text-subtle);
-  cursor: not-allowed;
-}
-
-.choice:disabled .dot {
-  opacity: 0.4;
-}
-
 .choice-note {
   color: var(--color-text-subtle);
   font-size: var(--text-xs);
@@ -182,19 +171,67 @@
 }
 
 .pick-day app-icon {
-  color: var(--color-text-subtle);
   flex: none;
 }
 
-.pick-day:disabled {
-  color: var(--color-text-subtle);
-  cursor: not-allowed;
+/* The day typed, where the browser has no picker to show: the line "Pick a day" was, as a named
+   field, with the days there are under it. */
+.day-row {
+  align-items: center;
+  display: flex;
+  font-size: var(--text-sm);
+  gap: 0.75rem;
+  justify-content: space-between;
+  min-height: 2.5rem;
+  padding: 0.3rem 0.75rem;
 }
 
-.menu-foot {
+.day-row-label {
+  color: var(--color-text-muted);
+}
+
+.day-input {
+  accent-color: var(--color-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  min-height: 2rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.day-input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.day-input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.range-note {
   color: var(--color-text-subtle);
   font-size: var(--text-xs);
   line-height: 1.45;
   margin: 0;
-  padding: 0.5rem 0.75rem 0.2rem;
+  padding: 0.15rem 0.75rem 0.2rem;
+}
+
+.range-note--outside {
+  color: var(--color-danger);
+}
+
+/* A finger's worth of line on a phone. */
+@media (max-width: 640px) {
+  .choice,
+  .pick-day,
+  .day-row {
+    min-height: 2.75rem;
+  }
+
+  .day-input {
+    min-height: 2.25rem;
+  }
 }

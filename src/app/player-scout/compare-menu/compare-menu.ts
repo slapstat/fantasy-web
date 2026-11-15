@@ -1,11 +1,14 @@
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   computed,
   ElementRef,
   inject,
+  Injector,
   input,
   output,
+  signal,
   viewChild,
 } from '@angular/core';
 import { ScoutSince } from '../../api/models/scout-since';
@@ -100,12 +103,10 @@ export interface CompareChoice {
   /** `off`, `preseason`, or the ISO day. */
   readonly key: string;
   readonly label: string;
-  /** The grey note on the right: the date behind a relative day, how long ago a date was. */
+  /** The grey note on the right: the date a day's words stand for. */
   readonly note: string;
   /** The day the choice stands for, null for the preseason; absent for off. */
   readonly day?: string | null;
-  /** Whether a projection is kept for it. A day that is not is shown, but cannot be picked. */
-  readonly kept: boolean;
   readonly picked: boolean;
 }
 
@@ -124,6 +125,11 @@ export interface CompareChoice {
  * picked in it: the day segment used to switch the comparison on against a week back on the
  * press that opened the picker, so dismissing the picker left a comparison with a day the reader
  * never chose.
+ *
+ * <p>Only a day that can be compared with is a line (Alexander, 2026-11-15): a day before the
+ * first one on record used to be listed greyed out with "not kept" beside it and a footer saying
+ * from when days are kept, which asked the reader to think about what is stored. The picker's
+ * own limits say the same thing without the words.
  */
 @Component({
   selector: 'app-compare-menu',
@@ -150,7 +156,18 @@ export class CompareMenuComponent {
   readonly cleared = output<void>();
 
   private readonly field = viewChild.required<ElementRef<HTMLInputElement>>('field');
+  private readonly typed = viewChild<ElementRef<HTMLInputElement>>('typed');
+  private readonly trigger = viewChild.required(PopoverTriggerDirective);
   private readonly layout = inject(PLANNER_LAYOUT);
+  private readonly injector = inject(Injector);
+
+  /**
+   * Whether "Pick a day" is a field in the menu instead of the platform's picker: set once the
+   * browser has shown it will not open one, and kept, since asking again would only fail again.
+   */
+  readonly typing = signal(false);
+  /** Whether the day last entered fell outside the days on record. */
+  readonly outside = signal(false);
 
   /**
    * The earliest day the picker offers: the first day kept, or, until one is, the season's first
@@ -181,42 +198,39 @@ export class CompareMenuComponent {
     const yesterday = daysBefore(today, 1);
     const weekAgo = daysBefore(today, 7);
     const days = new Map<string, CompareChoice>();
-    const day = (iso: string, label: string, note: string) => {
-      const kept = this.kept(iso);
-      days.set(iso, {
-        key: iso,
-        label,
-        note: kept ? note : `${note}, not kept`,
-        day: iso,
-        kept,
-        picked: on && since === iso,
-      });
+    // A day is a line only if it can be compared with. The one picked stays whatever the record
+    // says, so the menu never opens with no line marked.
+    const day = (iso: string, label: string) => {
+      const picked = on && since === iso;
+      if (picked || this.kept(iso)) {
+        days.set(iso, { key: iso, label, note: formatDay(iso), day: iso, picked });
+      }
     };
-    day(yesterday, 'Yesterday', formatDay(yesterday));
-    day(weekAgo, 'A week ago', formatDay(weekAgo));
-    // The day picked once stays a line of its own, so the reader can go between it and a week ago.
+    day(yesterday, 'Yesterday');
+    day(weekAgo, 'A week ago');
+    // The day picked once stays a line of its own, so the reader can go between it and a week
+    // ago. Its words first and its date beside them, as on the two lines above.
     if (since !== null && !days.has(since)) {
-      day(since, formatDay(since), relativeDay(since, today));
+      const ago = relativeDay(since, today);
+      day(since, ago.charAt(0).toUpperCase() + ago.slice(1));
     }
     return [
-      { key: 'off', label: 'Nothing', note: 'today only', kept: true, picked: !on },
+      { key: 'off', label: 'Nothing', note: 'today only', picked: !on },
       ...[...days.values()].sort((a, b) => b.key.localeCompare(a.key)),
       {
         key: 'preseason',
         label: 'Preseason',
         note: 'before game 1',
         day: null,
-        kept: true,
         picked: on && since === null,
       },
     ];
   });
 
-  /** The menu's last line: from when days are kept, so a disabled day has its reason. */
-  readonly footer = computed(() => {
-    const earliest = this.earliestKept();
-    return earliest === null ? 'No day is kept yet.' : `Days are kept from ${formatDay(earliest)}.`;
-  });
+  /** Under the typed field: the days there are, which is also what to do about one outside them. */
+  readonly range = computed(
+    () => `Pick a day from ${formatDay(this.earliest())} to ${formatDay(this.latest())}.`,
+  );
 
   /** What the button says after "Compare with" while a comparison is on: the day and how long ago. */
   readonly value = computed(() => {
@@ -239,6 +253,7 @@ export class CompareMenuComponent {
   });
 
   pick(choice: CompareChoice, menu: PopoverTriggerDirective): void {
+    this.outside.set(false);
     menu.close();
     if (choice.key === 'off') {
       this.cleared.emit();
@@ -248,37 +263,93 @@ export class CompareMenuComponent {
   }
 
   /**
-   * "Pick a day": the menu closes and the platform's date picker opens on the button, where the
-   * field hides. Nothing changes until a day is picked in it ({@link onDate}).
+   * The arrows walk the lines, round the ends, and Home and End reach them, as in any radio
+   * group. They only move: a line is picked with Enter or Space, since picking closes the menu
+   * and reloads the list, which is no thing to do on the way past.
    */
-  pickDay(menu: PopoverTriggerDirective): void {
-    menu.close();
-    this.openPicker();
-  }
-
-  /** A day picked in the field. One outside the kept days is not a day the menu offers. */
-  onDate(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    if (value && value >= this.earliest() && value <= this.latest()) {
-      this.sinceChange.emit(value);
+  onArrow(event: KeyboardEvent): void {
+    const lines = [
+      ...(event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="radio"]'),
+    ];
+    const at = lines.indexOf(event.target as HTMLElement);
+    const last = lines.length - 1;
+    const to = new Map<string, number>([
+      ['ArrowDown', at === last ? 0 : at + 1],
+      ['ArrowRight', at === last ? 0 : at + 1],
+      ['ArrowUp', at <= 0 ? last : at - 1],
+      ['ArrowLeft', at <= 0 ? last : at - 1],
+      ['Home', 0],
+      ['End', last],
+    ]).get(event.key);
+    if (to === undefined) {
+      return;
     }
+    event.preventDefault();
+    lines[to]?.focus();
   }
 
   /**
-   * The platform's date picker, anchored on the button the field hides under. A browser that
-   * refuses (no user activation, or none to show) gets the field focused instead, where a day
-   * can still be typed.
+   * "Pick a day": the platform's date picker opens on the button, where the field hides, and the
+   * menu closes behind it. Nothing changes until a day is picked in it ({@link onDate}). A
+   * browser that will not open one (none to show, or no user activation) leaves the menu open
+   * and turns the line into a field to type the day into.
    */
-  private openPicker(): void {
+  pickDay(menu: PopoverTriggerDirective): void {
+    this.outside.set(false);
     const field = this.field().nativeElement;
     try {
       if (typeof field.showPicker === 'function') {
         field.showPicker();
+        menu.close();
         return;
       }
     } catch {
-      // Fall through to the field itself.
+      // Fall through to the typed field.
     }
-    field.focus();
+    this.typeTheDay();
+  }
+
+  /**
+   * A day picked in the platform's picker. Its limits keep it to the days on record; a browser
+   * that lets one through anyway gets the menu back with the typed field and the days there are,
+   * rather than a pick that did nothing.
+   */
+  onDate(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    if (!value) {
+      return;
+    }
+    if (this.onRecord(value)) {
+      this.sinceChange.emit(value);
+      return;
+    }
+    this.outside.set(true);
+    this.trigger().open();
+    this.typeTheDay();
+  }
+
+  /** A day typed into the menu's own field. */
+  onTyped(event: Event, menu: PopoverTriggerDirective): void {
+    const value = (event.target as HTMLInputElement).value;
+    if (!value) {
+      this.outside.set(false);
+      return;
+    }
+    if (!this.onRecord(value)) {
+      this.outside.set(true);
+      return;
+    }
+    this.outside.set(false);
+    menu.close();
+    this.sinceChange.emit(value);
+  }
+
+  private onRecord(day: string): boolean {
+    return day >= this.earliest() && day <= this.latest();
+  }
+
+  private typeTheDay(): void {
+    this.typing.set(true);
+    afterNextRender(() => this.typed()?.nativeElement.focus(), { injector: this.injector });
   }
 }
