@@ -1,98 +1,120 @@
-<!-- The button is the control: white in rest, navy with the day on it once a comparison is on.
-     The platform's date field hides under it, so the picker "Pick a day" opens is anchored
-     here; the field is the picker's vehicle, not a stop of its own. -->
-<button
-  #menu="appPopover"
-  type="button"
-  class="compare-btn"
-  [class.compare-btn--on]="on()"
-  [appPopover]="compareMenu"
-  popoverAlign="start"
-  popoverLabel="Compare today's projection with"
->
-  @if (short(); as face) {
-    <span class="compare-value">{{ face }}</span>
-  } @else if (!on()) {
-    <span class="compare-value">Projection Change</span>
-  } @else {
-    <span class="compare-lead">Compare with · </span>
-    <span class="compare-value">{{ value() }}</span>
+<!-- One pill: white in rest, navy with the day on it once a comparison is on, and then two
+     buttons, as the player filter's pill is. The words open the menu; the cross switches the
+     comparison off in one press. -->
+<span class="compare">
+  <button
+    #opener
+    #menu="appPopover"
+    type="button"
+    class="compare-btn"
+    [class.compare-btn--on]="on()"
+    [appPopover]="compareMenu"
+    popoverAlign="start"
+    popoverLabel="Compare today's projection with"
+    (click)="startOver()"
+  >
+    @if (short(); as face) {
+      <span class="compare-value">{{ face }}</span>
+    } @else if (!on()) {
+      <span class="compare-value">Projection Change</span>
+    } @else {
+      <span class="compare-lead">Compare with · </span>
+      <span class="compare-value">{{ value() }}</span>
+    }
+    <app-icon class="chevron" name="chevron-down" [size]="14" />
+  </button>
+  @if (on()) {
+    <button
+      type="button"
+      class="compare-clear"
+      appTooltip="Stop comparing"
+      aria-label="Stop comparing"
+      (click)="clear()"
+    >
+      <app-icon name="close" [size]="14" />
+    </button>
   }
-  <app-icon class="chevron" name="chevron-down" [size]="14" />
-</button>
-<input
-  #field
-  class="day-field"
-  type="date"
-  tabindex="-1"
-  aria-hidden="true"
-  [min]="earliest()"
-  [max]="latest()"
-  [value]="since() ?? ''"
-  (change)="onDate($event)"
-/>
+</span>
 
-<!-- One radio group, entered and left with one Tab: the arrows move between its lines, and the
-     menu opens on the line picked. "Pick a day" is not one of the answers, so it sits under the
-     group, not in it. -->
+<!-- The menu finishes the sentence in its title: the preseason, or a day pressed in the calendar.
+     The days are one tab stop, walked with the arrows; the month's two arrows turn it without
+     picking anything. -->
 <ng-template #compareMenu>
   <div class="menu">
-    <p id="compare-menu-title" class="menu-title">Compare today's projection with</p>
-    <div
-      class="choices"
-      role="radiogroup"
-      aria-labelledby="compare-menu-title"
-      (keydown)="onArrow($event)"
+    <p class="menu-title">Compare today's projection with</p>
+    <button
+      type="button"
+      class="preseason"
+      [attr.aria-pressed]="preseasonPicked()"
+      [attr.data-popover-initial-focus]="preseasonPicked() ? '' : null"
+      (click)="pick(null, menu)"
     >
-      @for (choice of choices(); track choice.key) {
-        <button
-          type="button"
-          class="choice"
-          role="radio"
-          [attr.aria-checked]="choice.picked"
-          [attr.tabindex]="choice.picked ? 0 : -1"
-          [attr.data-popover-initial-focus]="choice.picked ? '' : null"
-          (click)="pick(choice, menu)"
-        >
-          <span class="dot"></span>
-          <span class="choice-label">{{ choice.label }}</span>
-          <span class="choice-note">{{ choice.note }}</span>
-        </button>
-      }
-    </div>
+      <span class="preseason-label">Preseason</span>
+      <span class="preseason-note">before game 1</span>
+    </button>
     @if (!noDayYet()) {
       <div class="divider" role="presentation"></div>
-      @if (typing()) {
-        <!-- Where the browser shows no picker of its own: a field to type the day into, in the
-             menu, where it can be seen and is named. -->
-        <label class="day-row">
-          <span class="day-row-label">Day</span>
-          <input
-            #typed
-            class="day-input"
-            type="date"
-            aria-describedby="compare-menu-range"
-            [attr.aria-invalid]="outside() ? 'true' : null"
-            [min]="earliest()"
-            [max]="latest()"
-            [value]="since() ?? ''"
-            (change)="onTyped($event, menu)"
-          />
-        </label>
-        <p
-          id="compare-menu-range"
-          class="range-note"
-          [class.range-note--outside]="outside()"
-          aria-live="polite"
+      <div class="month">
+        <!-- At the first and last month the arrow stays in the tab order and only stops
+             answering: a button disabled under the finger that pressed it drops focus out of the
+             menu. -->
+        <button
+          type="button"
+          class="month-turn"
+          aria-label="Previous month"
+          [attr.aria-disabled]="hasEarlier() ? null : 'true'"
+          (click)="turn(-1)"
         >
-          {{ range() }}
-        </p>
-      } @else {
-        <button type="button" class="pick-day" (click)="pickDay(menu)">
-          <app-icon name="calendar-days" [size]="16" />
-          Pick a day
+          <app-icon name="chevron-left" [size]="16" />
         </button>
-      }
+        <p id="compare-menu-month" class="month-name" aria-live="polite">{{ monthLabel() }}</p>
+        <button
+          type="button"
+          class="month-turn"
+          aria-label="Next month"
+          [attr.aria-disabled]="hasLater() ? null : 'true'"
+          (click)="turn(1)"
+        >
+          <app-icon name="chevron-right" [size]="16" />
+        </button>
+      </div>
+      <table class="days" aria-labelledby="compare-menu-month" (keydown)="onDayKey($event)">
+        <thead>
+          <tr>
+            @for (weekday of weekdays; track weekday.name) {
+              <th scope="col" [attr.abbr]="weekday.name">{{ weekday.short }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (week of weeks(); track $index) {
+            <tr>
+              @for (day of week; track $index) {
+                <td>
+                  @if (day) {
+                    <button
+                      type="button"
+                      class="day"
+                      [class.day--picked]="day.picked"
+                      [class.day--today]="day.today"
+                      [disabled]="!day.offered"
+                      [attr.aria-pressed]="day.offered ? day.picked : null"
+                      [attr.aria-current]="day.today ? 'date' : null"
+                      [attr.aria-label]="day.label"
+                      [attr.data-day]="day.iso"
+                      [attr.tabindex]="day.iso === tabStop() ? 0 : -1"
+                      [attr.data-popover-initial-focus]="day.picked ? '' : null"
+                      (click)="pick(day.iso, menu)"
+                    >
+                      {{ day.date }}
+                    </button>
+                  }
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
     }
   </div>
 </ng-template>

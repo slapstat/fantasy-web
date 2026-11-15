@@ -10,7 +10,10 @@ import {
   daysBetween,
   formatDay,
   relativeDay,
-  seasonFloor,
+  shiftMonth,
+  formatMonth,
+  monthOf,
+  monthWeeks,
   sinceCaption,
 } from './compare-menu';
 
@@ -34,16 +37,10 @@ describe('the day arithmetic', () => {
     expect(formatDay(null)).toBe('');
   });
 
-  it('says how long ago a day was, in the words the menu uses for its own lines', () => {
+  it('says how long ago a day was, in the words the button uses', () => {
     expect(relativeDay('2026-10-19', TODAY)).toBe('yesterday');
     expect(relativeDay('2026-10-13', TODAY)).toBe('a week ago');
     expect(relativeDay('2026-10-15', TODAY)).toBe('5 days ago');
-  });
-
-  it('floors a season at its first of October, on either side of the new year', () => {
-    expect(seasonFloor('2026-10-14')).toBe('2026-10-01');
-    expect(seasonFloor('2027-03-02')).toBe('2026-10-01');
-    expect(seasonFloor('2026-09-20')).toBe('2026-10-01');
   });
 });
 
@@ -72,6 +69,39 @@ describe('sinceCaption', () => {
   });
 });
 
+describe('the calendar arithmetic', () => {
+  it('lays a month out as six weeks, Monday first', () => {
+    const weeks = monthWeeks('2026-10');
+
+    expect(weeks).toHaveLength(6);
+    expect(weeks.every((week) => week.length === 7)).toBe(true);
+    // The first of October 2026 is a Thursday.
+    expect(weeks[0]).toEqual([
+      null,
+      null,
+      null,
+      '2026-10-01',
+      '2026-10-02',
+      '2026-10-03',
+      '2026-10-04',
+    ]);
+    expect(weeks.flat().filter(Boolean)).toHaveLength(31);
+    expect(weeks[5]).toEqual([null, null, null, null, null, null, null]);
+  });
+
+  it('starts a month that opens on a Monday in the first column, and one on a Sunday in the last', () => {
+    expect(monthWeeks('2027-02')[0][0]).toBe('2027-02-01');
+    expect(monthWeeks('2026-11')[0]).toEqual([null, null, null, null, null, null, '2026-11-01']);
+  });
+
+  it('turns months across the new year, and names one', () => {
+    expect(shiftMonth('2026-12', 1)).toBe('2027-01');
+    expect(shiftMonth('2027-01', -1)).toBe('2026-12');
+    expect(monthOf('2026-10-14')).toBe('2026-10');
+    expect(formatMonth('2026-11')).toBe('November 2026');
+  });
+});
+
 describe('CompareMenuComponent', () => {
   const layout = signal<PlannerLayout>('desktop');
 
@@ -91,13 +121,14 @@ describe('CompareMenuComponent', () => {
     on: boolean,
     since: string | null,
     earliestKept: string | null = '2026-10-14',
-    sinceChange = vi.fn(),
-    cleared = vi.fn(),
+    today = TODAY,
   ) {
+    const sinceChange = vi.fn();
+    const cleared = vi.fn();
     const fixture = MockRender(CompareMenuComponent, {
       on,
       since,
-      today: TODAY,
+      today,
       earliestKept,
       sinceChange,
       cleared,
@@ -107,35 +138,29 @@ describe('CompareMenuComponent', () => {
 
   type Fixture = ReturnType<typeof render>['fixture'];
   const button = (fixture: Fixture) => ngMocks.find(fixture, '.compare-btn');
-  const field = (fixture: Fixture) => ngMocks.find(fixture, 'input.day-field');
+  const cross = (fixture: Fixture) => ngMocks.find(fixture, '.compare-clear', null);
   const panel = () => document.querySelector<HTMLElement>('.app-popover-panel');
   const open = (fixture: Fixture) => {
     ngMocks.click(button(fixture));
     fixture.detectChanges();
     return panel()!;
   };
-  const choices = (menu: HTMLElement) => [...menu.querySelectorAll<HTMLButtonElement>('.choice')];
-  const lines = (menu: HTMLElement) =>
-    choices(menu).map((choice) => ({
-      label: choice.querySelector('.choice-label')!.textContent.trim(),
-      note: choice.querySelector('.choice-note')!.textContent.trim(),
-      picked: choice.getAttribute('aria-checked') === 'true',
-    }));
-  const press = (target: HTMLElement, key: string) =>
-    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
-  const focused = () => document.activeElement?.querySelector('.choice-label')?.textContent.trim();
-  /** A browser that will not open a picker: "Pick a day" becomes the menu's own field. */
-  const typedField = async (fixture: Fixture) => {
-    const input = field(fixture).nativeElement as HTMLInputElement;
-    input.showPicker = vi.fn(() => {
-      throw new DOMException('no activation', 'NotAllowedError');
-    });
-    const menu = open(fixture);
-    menu.querySelector<HTMLButtonElement>('.pick-day')!.click();
+  const preseason = (menu: HTMLElement) => menu.querySelector<HTMLButtonElement>('.preseason')!;
+  const days = (menu: HTMLElement) => [...menu.querySelectorAll<HTMLButtonElement>('.day')];
+  const day = (menu: HTMLElement, iso: string) =>
+    menu.querySelector<HTMLButtonElement>(`.day[data-day="${iso}"]`)!;
+  const offered = (menu: HTMLElement) =>
+    days(menu)
+      .filter((cell) => !cell.disabled)
+      .map((cell) => cell.dataset['day']);
+  const month = (menu: HTMLElement) => menu.querySelector('.month-name')!.textContent.trim();
+  const turns = (menu: HTMLElement) => [...menu.querySelectorAll<HTMLButtonElement>('.month-turn')];
+  const press = async (fixture: Fixture, target: HTMLElement, key: string) => {
+    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
     fixture.detectChanges();
     await fixture.whenStable();
-    return { menu, typed: menu.querySelector<HTMLInputElement>('input.day-input')! };
   };
+  const focused = () => (document.activeElement as HTMLElement | null)?.dataset['day'];
 
   it('reads Projection Change while no comparison is on, and as the day once one is', () => {
     const { fixture } = render(false, null);
@@ -176,238 +201,288 @@ describe('CompareMenuComponent', () => {
     expect(ngMocks.formatText(button(fixture))).toBe('Projection Change');
   });
 
-  it('finishes the sentence with nothing, each relative day there is a projection for, and the preseason', () => {
-    const { fixture } = render(false, null, '2026-10-10');
+  it('has no cross in rest, where there is nothing to switch off', () => {
+    const { fixture } = render(false, '2026-10-15');
+
+    expect(cross(fixture)).toBeNull();
+  });
+
+  it('switches the comparison off from the cross, in one press and without opening the menu', () => {
+    const { fixture, sinceChange, cleared } = render(true, '2026-10-15');
+    const clear = cross(fixture)!.nativeElement as HTMLButtonElement;
+    expect(clear.getAttribute('aria-label')).toBe('Stop comparing');
+
+    clear.click();
+
+    expect(cleared).toHaveBeenCalledTimes(1);
+    expect(sinceChange).not.toHaveBeenCalled();
+    expect(panel()).toBeNull();
+    // The cross goes with the comparison: focus lands on the button it sat on.
+    expect(document.activeElement).toBe(button(fixture).nativeElement);
+  });
+
+  it('finishes the sentence with the preseason or a day of the calendar, and nothing else', () => {
+    const { fixture } = render(false, null);
 
     const menu = open(fixture);
 
     expect(menu.querySelector('.menu-title')!.textContent.trim()).toBe(
       "Compare today's projection with",
     );
-    expect(lines(menu)).toEqual([
-      { label: 'Nothing', note: 'today only', picked: true },
-      { label: 'Yesterday', note: '19 Oct', picked: false },
-      { label: 'A week ago', note: '13 Oct', picked: false },
-      { label: 'Preseason', note: 'before game 1', picked: false },
+    expect(menu.getAttribute('aria-label')).toBe("Compare today's projection with");
+    expect(preseason(menu).querySelector('.preseason-label')!.textContent.trim()).toBe('Preseason');
+    expect(preseason(menu).querySelector('.preseason-note')!.textContent.trim()).toBe(
+      'before game 1',
+    );
+    expect(month(menu)).toBe('October 2026');
+    expect([...menu.querySelectorAll('th')].map((th) => th.textContent.trim())).toEqual([
+      'Mo',
+      'Tu',
+      'We',
+      'Th',
+      'Fr',
+      'Sa',
+      'Su',
     ]);
-    expect(menu.querySelector('.pick-day')).not.toBeNull();
+    expect(days(menu)).toHaveLength(31);
+    expect(menu.querySelectorAll('button')).toHaveLength(1 + 2 + 31);
   });
 
-  it('leaves out a day before the first on record, and says nothing about what is stored', () => {
+  it('lets only a day on record be pressed: from the first kept to yesterday', () => {
     const { fixture } = render(false, null);
 
     const menu = open(fixture);
 
-    expect(lines(menu).map((line) => line.label)).toEqual(['Nothing', 'Yesterday', 'Preseason']);
-    expect(choices(menu).some((choice) => choice.disabled)).toBe(false);
+    expect(offered(menu)).toEqual([
+      '2026-10-14',
+      '2026-10-15',
+      '2026-10-16',
+      '2026-10-17',
+      '2026-10-18',
+      '2026-10-19',
+    ]);
+    // Nothing says why the others do not answer.
     expect(menu.textContent).not.toContain('kept');
   });
 
-  it('names the panel as the sentence the menu finishes, not as the day on the button', () => {
-    const { fixture } = render(true, '2026-10-15');
-
-    expect(open(fixture).getAttribute('aria-label')).toBe("Compare today's projection with");
-  });
-
-  it('keeps the day last picked as a line of its own, in its place among the days, and marks it', () => {
-    const { fixture } = render(true, '2026-10-15', '2026-10-10');
-
-    expect(lines(open(fixture))).toEqual([
-      { label: 'Nothing', note: 'today only', picked: false },
-      { label: 'Yesterday', note: '19 Oct', picked: false },
-      { label: '5 days ago', note: '15 Oct', picked: true },
-      { label: 'A week ago', note: '13 Oct', picked: false },
-      { label: 'Preseason', note: 'before game 1', picked: false },
-    ]);
-  });
-
-  it('keeps the day picked as a line even once it falls before the first on record', () => {
-    const { fixture } = render(true, '2026-10-12');
-
-    expect(lines(open(fixture))).toContainEqual({
-      label: '8 days ago',
-      note: '12 Oct',
-      picked: true,
-    });
-  });
-
-  it('marks the relative day as the pick, rather than listing the same day twice', () => {
-    const { fixture } = render(true, '2026-10-19');
-
-    const all = lines(open(fixture));
-    expect(all.map((line) => line.label)).toEqual(['Nothing', 'Yesterday', 'Preseason']);
-    expect(all[1].picked).toBe(true);
-  });
-
-  it('marks the preseason as the pick once the comparison is on with no day', () => {
-    const { fixture } = render(true, null);
-
-    expect(lines(open(fixture)).map((line) => line.picked)).toEqual([false, false, true]);
-  });
-
-  it('switches on against a day, or the preseason, and off for nothing, closing the menu each time', () => {
-    const { fixture, sinceChange, cleared } = render(false, null);
-
-    choices(open(fixture))[1].click();
-    expect(panel()).toBeNull();
-    choices(open(fixture))[2].click();
-    choices(open(fixture))[0].click();
-
-    expect(sinceChange.mock.calls).toEqual([['2026-10-19'], [null]]);
-    expect(cleared).toHaveBeenCalledTimes(1);
-  });
-
-  it('is one radio group with one tab stop, which is the line picked, and opens on it', () => {
-    const { fixture } = render(true, '2026-10-19');
-
-    const menu = open(fixture);
-    const group = menu.querySelector('[role="radiogroup"]')!;
-
-    expect(choices(menu).map((choice) => choice.getAttribute('tabindex'))).toEqual([
-      '-1',
-      '0',
-      '-1',
-    ]);
-    expect(focused()).toBe('Yesterday');
-    // "Pick a day" is not one of the answers.
-    expect(group.querySelector('.pick-day')).toBeNull();
-    expect(group.getAttribute('aria-labelledby')).toBe('compare-menu-title');
-  });
-
-  it('walks the lines with the arrows, round the ends, and reaches them with Home and End, picking nothing', () => {
-    const { fixture, sinceChange, cleared } = render(false, null);
-
-    const all = choices(open(fixture));
-    expect(focused()).toBe('Nothing');
-
-    press(all[0], 'ArrowDown');
-    expect(focused()).toBe('Yesterday');
-    press(all[1], 'ArrowUp');
-    press(all[0], 'ArrowUp');
-    expect(focused()).toBe('Preseason');
-    press(all[2], 'ArrowDown');
-    expect(focused()).toBe('Nothing');
-    press(all[0], 'End');
-    expect(focused()).toBe('Preseason');
-    press(all[2], 'Home');
-    expect(focused()).toBe('Nothing');
-
-    expect(panel()).not.toBeNull();
-    expect(sinceChange).not.toHaveBeenCalled();
-    expect(cleared).not.toHaveBeenCalled();
-  });
-
-  it('opens the platform picker from "Pick a day" and changes nothing until a day is picked in it', () => {
-    const { fixture, sinceChange, cleared } = render(false, null);
-    const input = field(fixture).nativeElement as HTMLInputElement;
-    const showPicker = vi.fn();
-    input.showPicker = showPicker;
-
-    open(fixture).querySelector<HTMLButtonElement>('.pick-day')!.click();
-
-    expect(panel()).toBeNull();
-    expect(showPicker).toHaveBeenCalledTimes(1);
-    // The picker dismissed: no comparison with a day the reader never chose.
-    expect(sinceChange).not.toHaveBeenCalled();
-    expect(cleared).not.toHaveBeenCalled();
-
-    input.value = '2026-10-16';
-    input.dispatchEvent(new Event('change'));
-
-    expect(sinceChange).toHaveBeenCalledExactlyOnceWith('2026-10-16');
-  });
-
-  it('offers no day before the first on record nor later than yesterday', () => {
-    const { fixture } = render(true, '2026-10-15');
-    const input = field(fixture).nativeElement as HTMLInputElement;
-
-    expect(input.min).toBe('2026-10-14');
-    expect(input.max).toBe('2026-10-19');
-  });
-
-  it('turns "Pick a day" into a named field in the menu where the browser will not show a picker', async () => {
-    const { fixture, sinceChange } = render(true, '2026-10-15');
-    const hidden = field(fixture).nativeElement as HTMLInputElement;
-    const hiddenFocus = vi.spyOn(hidden, 'focus');
-
-    const { menu, typed } = await typedField(fixture);
-
-    // The menu stays, and focus is on a field that can be seen and is named: never on the hidden
-    // one, which is off the accessibility tree.
-    expect(panel()).not.toBeNull();
-    expect(menu.querySelector('.pick-day')).toBeNull();
-    expect(typed.closest('label')!.textContent.trim()).toBe('Day');
-    expect(document.activeElement).toBe(typed);
-    expect(hiddenFocus).not.toHaveBeenCalled();
-    expect(typed.min).toBe('2026-10-14');
-    expect(typed.max).toBe('2026-10-19');
-    expect(menu.querySelector('.range-note')!.textContent.trim()).toBe(
-      'Pick a day from 14 Oct to 19 Oct.',
-    );
-    expect(sinceChange).not.toHaveBeenCalled();
-  });
-
-  it('takes a day typed into that field and closes the menu', async () => {
-    const { fixture, sinceChange } = render(true, '2026-10-15');
-    const { typed } = await typedField(fixture);
-
-    typed.value = '2026-10-17';
-    typed.dispatchEvent(new Event('change'));
-
-    expect(sinceChange).toHaveBeenCalledExactlyOnceWith('2026-10-17');
-    expect(panel()).toBeNull();
-  });
-
-  it('says so when the day typed is outside the days on record, and keeps the menu open', async () => {
-    const { fixture, sinceChange } = render(true, '2026-10-15');
-    const { menu, typed } = await typedField(fixture);
-
-    typed.value = '2026-10-12';
-    typed.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-
-    expect(sinceChange).not.toHaveBeenCalled();
-    expect(panel()).not.toBeNull();
-    expect(typed.getAttribute('aria-invalid')).toBe('true');
-    expect(typed.getAttribute('aria-describedby')).toBe('compare-menu-range');
-    expect(menu.querySelector('.range-note')!.classList).toContain('range-note--outside');
-
-    typed.value = '2026-10-16';
-    typed.dispatchEvent(new Event('change'));
-
-    expect(sinceChange).toHaveBeenCalledExactlyOnceWith('2026-10-16');
-  });
-
-  it('brings the menu back with the days there are when the picker hands over a day outside them', async () => {
-    const { fixture, sinceChange } = render(true, '2026-10-15');
-    const input = field(fixture).nativeElement as HTMLInputElement;
-
-    input.value = '2026-10-12';
-    input.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-    await fixture.whenStable();
-
-    expect(sinceChange).not.toHaveBeenCalled();
-    const note = panel()!.querySelector('.range-note')!;
-    expect(note.textContent.trim()).toBe('Pick a day from 14 Oct to 19 Oct.');
-    expect(note.classList).toContain('range-note--outside');
-  });
-
-  it('keeps the day field out of the tab order and off the accessibility tree', () => {
+  it('marks today, which is what the days are compared with and so is not one of them', () => {
     const { fixture } = render(false, null);
 
-    expect(field(fixture).attributes['tabindex']).toBe('-1');
-    expect(field(fixture).attributes['aria-hidden']).toBe('true');
+    const today = day(open(fixture), TODAY);
+
+    expect(today.disabled).toBe(true);
+    expect(today.getAttribute('aria-current')).toBe('date');
+    expect(today.getAttribute('aria-label')).toBe('20 October, today');
+    expect(today.classList).toContain('day--today');
   });
 
-  it('offers nothing and the preseason alone while there is no day on record', () => {
+  it('names each day in full for a screen reader, and shows its date alone', () => {
+    const { fixture } = render(false, null);
+
+    const cell = day(open(fixture), '2026-10-15');
+
+    expect(cell.getAttribute('aria-label')).toBe('15 October');
+    expect(cell.textContent.trim()).toBe('15');
+  });
+
+  it('switches on against the day pressed, or the preseason, closing the menu each time', () => {
+    const { fixture, sinceChange, cleared } = render(false, null);
+
+    day(open(fixture), '2026-10-16').click();
+    expect(panel()).toBeNull();
+    preseason(open(fixture)).click();
+    expect(panel()).toBeNull();
+
+    expect(sinceChange.mock.calls).toEqual([['2026-10-16'], [null]]);
+    expect(cleared).not.toHaveBeenCalled();
+  });
+
+  it('picks nothing for the reader: opening and closing the menu changes nothing', () => {
+    const { fixture, sinceChange, cleared } = render(false, null);
+
+    const menu = open(fixture);
+    expect(preseason(menu).getAttribute('aria-pressed')).toBe('false');
+    expect(days(menu).some((cell) => cell.getAttribute('aria-pressed') === 'true')).toBe(false);
+    ngMocks.click(button(fixture));
+
+    expect(panel()).toBeNull();
+    expect(sinceChange).not.toHaveBeenCalled();
+    expect(cleared).not.toHaveBeenCalled();
+  });
+
+  it('marks the day picked and opens on it', () => {
+    const { fixture } = render(true, '2026-10-15');
+
+    const menu = open(fixture);
+
+    expect(
+      days(menu)
+        .filter((cell) => cell.getAttribute('aria-pressed') === 'true')
+        .map((cell) => cell.dataset['day']),
+    ).toEqual(['2026-10-15']);
+    expect(day(menu, '2026-10-15').classList).toContain('day--picked');
+    expect(preseason(menu).getAttribute('aria-pressed')).toBe('false');
+    expect(focused()).toBe('2026-10-15');
+  });
+
+  it('does not mark the day kept from last time while the comparison is off', () => {
+    const { fixture } = render(false, '2026-10-15');
+
+    const menu = open(fixture);
+
+    expect(day(menu, '2026-10-15').getAttribute('aria-pressed')).toBe('false');
+    expect(day(menu, '2026-10-15').classList).not.toContain('day--picked');
+  });
+
+  it('marks the preseason as the pick once the comparison is on with no day, and opens on it', () => {
+    const { fixture } = render(true, null);
+
+    const menu = open(fixture);
+
+    expect(preseason(menu).getAttribute('aria-pressed')).toBe('true');
+    expect(days(menu).some((cell) => cell.classList.contains('day--picked'))).toBe(false);
+    expect(document.activeElement).toBe(preseason(menu));
+  });
+
+  it('opens on the month of the day picked, and otherwise on the latest month with a day in it', () => {
+    const picked = render(true, '2026-10-20', '2026-10-14', '2026-11-15');
+    expect(month(open(picked.fixture))).toBe('October 2026');
+    ngMocks.click(button(picked.fixture));
+
+    const rest = render(false, null, '2026-10-14', '2026-11-15');
+    expect(month(open(rest.fixture))).toBe('November 2026');
+    ngMocks.click(button(rest.fixture));
+
+    // On the first of a month the latest day is in the month before.
+    const first = render(false, null, '2026-10-14', '2026-11-01');
+    expect(month(open(first.fixture))).toBe('October 2026');
+  });
+
+  it('turns the months no further than the days there are, and picks nothing on the way', () => {
+    const { fixture, sinceChange } = render(false, null, '2026-10-14', '2026-11-15');
+    const menu = open(fixture);
+    const [earlier, later] = turns(menu);
+    expect(earlier.getAttribute('aria-label')).toBe('Previous month');
+    expect(later.getAttribute('aria-label')).toBe('Next month');
+    expect(later.getAttribute('aria-disabled')).toBe('true');
+    expect(earlier.getAttribute('aria-disabled')).toBeNull();
+
+    later.click();
+    fixture.detectChanges();
+    expect(month(menu)).toBe('November 2026');
+
+    earlier.click();
+    fixture.detectChanges();
+    expect(month(menu)).toBe('October 2026');
+    expect(offered(menu)[0]).toBe('2026-10-14');
+    expect(earlier.getAttribute('aria-disabled')).toBe('true');
+    expect(later.getAttribute('aria-disabled')).toBeNull();
+
+    earlier.click();
+    fixture.detectChanges();
+    expect(month(menu)).toBe('October 2026');
+
+    expect(panel()).not.toBeNull();
+    expect(sinceChange).not.toHaveBeenCalled();
+  });
+
+  it('starts over from its own month each time it opens', () => {
+    const { fixture } = render(false, null, '2026-10-14', '2026-11-15');
+    turns(open(fixture))[0].click();
+    fixture.detectChanges();
+    expect(month(panel()!)).toBe('October 2026');
+    ngMocks.click(button(fixture));
+
+    expect(month(open(fixture))).toBe('November 2026');
+  });
+
+  it('keeps the day picked on show even once it falls before the first on record', () => {
+    const { fixture } = render(true, '2026-09-28', '2026-10-14');
+
+    const menu = open(fixture);
+
+    expect(month(menu)).toBe('September 2026');
+    expect(day(menu, '2026-09-28').classList).toContain('day--picked');
+    expect(day(menu, '2026-09-28').disabled).toBe(true);
+    expect(turns(menu)[0].getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('makes the days one tab stop: the day picked, or the latest that can be pressed', () => {
+    const stops = (menu: HTMLElement) =>
+      days(menu)
+        .filter((cell) => cell.getAttribute('tabindex') === '0')
+        .map((cell) => cell.dataset['day']);
+
+    const picked = render(true, '2026-10-15');
+    expect(stops(open(picked.fixture))).toEqual(['2026-10-15']);
+    ngMocks.click(button(picked.fixture));
+
+    const rest = render(false, null);
+    expect(stops(open(rest.fixture))).toEqual(['2026-10-19']);
+  });
+
+  it('walks the days with the arrows, stopping at the first and last on record, and picks nothing', async () => {
+    const { fixture, sinceChange } = render(true, '2026-10-16');
+    const menu = open(fixture);
+    expect(focused()).toBe('2026-10-16');
+
+    await press(fixture, day(menu, '2026-10-16'), 'ArrowLeft');
+    expect(focused()).toBe('2026-10-15');
+    expect(day(menu, '2026-10-15').getAttribute('tabindex')).toBe('0');
+    expect(day(menu, '2026-10-16').getAttribute('tabindex')).toBe('-1');
+
+    await press(fixture, day(menu, '2026-10-15'), 'ArrowUp');
+    expect(focused()).toBe('2026-10-14');
+    await press(fixture, day(menu, '2026-10-14'), 'ArrowLeft');
+    expect(focused()).toBe('2026-10-14');
+
+    await press(fixture, day(menu, '2026-10-14'), 'ArrowRight');
+    await press(fixture, day(menu, '2026-10-15'), 'ArrowDown');
+    expect(focused()).toBe('2026-10-19');
+
+    // The week of the 12th runs Monday to Sunday: its ends, held to the days on record.
+    await press(fixture, day(menu, '2026-10-16'), 'Home');
+    expect(focused()).toBe('2026-10-14');
+    await press(fixture, day(menu, '2026-10-16'), 'End');
+    expect(focused()).toBe('2026-10-18');
+
+    expect(panel()).not.toBeNull();
+    expect(sinceChange).not.toHaveBeenCalled();
+  });
+
+  it('turns the month when the arrows cross its edge, and with Page Up and Page Down', async () => {
+    const { fixture } = render(true, '2026-11-01', '2026-10-14', '2026-11-15');
+    const menu = open(fixture);
+    expect(month(menu)).toBe('November 2026');
+
+    await press(fixture, day(menu, '2026-11-01'), 'ArrowLeft');
+    expect(month(menu)).toBe('October 2026');
+    expect(focused()).toBe('2026-10-31');
+
+    await press(fixture, day(menu, '2026-10-31'), 'PageDown');
+    expect(month(menu)).toBe('November 2026');
+    // November has no 31st, and the 30th is not a day yet: the last day there is.
+    expect(focused()).toBe('2026-11-14');
+
+    await press(fixture, day(menu, '2026-11-14'), 'PageUp');
+    expect(month(menu)).toBe('October 2026');
+    expect(focused()).toBe('2026-10-14');
+  });
+
+  it('offers the preseason alone while there is no day on record', () => {
     const { fixture } = render(false, null, null);
 
     const menu = open(fixture);
 
-    expect(lines(menu).map((line) => line.label)).toEqual(['Nothing', 'Preseason']);
-    expect(menu.querySelector('.pick-day')).toBeNull();
+    expect(preseason(menu)).not.toBeNull();
+    expect(menu.querySelector('.days')).toBeNull();
+    expect(menu.querySelector('.month')).toBeNull();
     expect(menu.querySelector('.divider')).toBeNull();
-    expect(field(fixture).attributes['min']).toBe('2026-10-01');
+  });
+
+  it('offers the preseason alone on the first day kept, when yesterday is not one yet', () => {
+    const { fixture } = render(false, null, TODAY);
+
+    expect(open(fixture).querySelector('.days')).toBeNull();
   });
 });

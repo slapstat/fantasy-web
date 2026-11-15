@@ -1,12 +1,15 @@
 /* One menu button that reads as a sentence, drawn as the page's pills are: white and outlined
-   in rest, filled navy once it carries a day. The platform's date field sits hidden under it,
-   and only lends it the picker. */
+   in rest, filled navy once it carries a day, and then two buttons in the one pill. */
 :host {
   display: inline-block;
-  position: relative;
 }
 
-.compare-btn {
+.compare {
+  display: inline-flex;
+}
+
+.compare-btn,
+.compare-clear {
   align-items: center;
   background: var(--color-surface);
   border: 1px solid var(--color-border-control);
@@ -31,20 +34,48 @@
   background: var(--color-surface-hover);
 }
 
-.compare-btn:focus-visible {
+/* The ring sits over the neighbouring half of the pill, not under it. */
+.compare-btn:focus-visible,
+.compare-clear:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
+  position: relative;
+  z-index: 1;
 }
 
-.compare-btn--on {
+.compare-btn--on,
+.compare-clear {
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: var(--color-primary-contrast);
 }
 
-.compare-btn--on:hover {
+.compare-btn--on {
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+  padding-right: 0.45rem;
+}
+
+/* The cross: the pill's other end, parted from the words by a hairline of the navy's own
+   secondary ink. */
+.compare-clear {
+  border-left-color: color-mix(in srgb, var(--color-primary-contrast) 30%, var(--color-primary));
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  padding: 0.3rem 0.55rem 0.3rem 0.45rem;
+}
+
+.compare-btn--on:hover,
+.compare-clear:hover {
   background: var(--color-primary-hover);
+}
+
+.compare-btn--on:hover {
   border-color: var(--color-primary-hover);
+}
+
+.compare-clear:hover {
+  border-bottom-color: var(--color-primary-hover);
+  border-right-color: var(--color-primary-hover);
+  border-top-color: var(--color-primary-hover);
 }
 
 /* "Compare with" is the half of the sentence that never changes: a shade quieter than the day. */
@@ -68,26 +99,12 @@
   transform: rotate(180deg);
 }
 
-/* The field under the button: the same box, so the picker the browser opens is anchored on the
-   button, and no size, colour or hit of its own. */
-.day-field {
-  border: 0;
-  height: 100%;
-  inset: 0;
-  margin: 0;
-  opacity: 0;
-  padding: 0;
-  pointer-events: none;
-  position: absolute;
-  width: 100%;
-}
-
-/* The menu: the sentence's first half as its title, one line for each way to finish it. The
-   title and the lines are drawn as the editor's Stats and Ranking menus draw theirs. */
+/* The menu: the sentence's first half as its title, then the two ways to finish it. The title
+   is drawn as the editor's Stats and Ranking menus draw theirs. */
 .menu {
   max-width: 92vw;
-  padding: 0.5rem 0.25rem 0.6rem;
-  width: 20rem;
+  padding: 0.5rem 0.5rem 0.6rem;
+  width: 18.5rem;
 }
 
 .menu-title {
@@ -96,12 +113,11 @@
   font-weight: var(--weight-semibold);
   letter-spacing: 0.08em;
   margin: 0;
-  padding: 0.35rem 0.75rem 0.4rem;
+  padding: 0.35rem 0.5rem 0.4rem;
   text-transform: uppercase;
 }
 
-.choice,
-.pick-day {
+.preseason {
   align-items: center;
   background: none;
   border: none;
@@ -111,141 +127,184 @@
   display: flex;
   font: inherit;
   font-size: var(--text-sm);
-  gap: 0.55rem;
+  justify-content: space-between;
   min-height: 2.25rem;
-  padding: 0.3rem 0.75rem;
+  padding: 0.3rem 0.5rem;
   text-align: left;
   width: 100%;
 }
 
-.choice:hover,
-.pick-day:hover {
+.preseason:hover,
+.day:hover:enabled,
+.month-turn:hover:not([aria-disabled='true']) {
   background: var(--color-surface-hover);
 }
 
-.choice:focus-visible,
-.pick-day:focus-visible {
+.preseason:focus-visible,
+.day:focus-visible,
+.month-turn:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
 }
 
-/* The one picked: the row washed and its dot filled in the blue the page's other radio (the
-   drop under My team) is drawn in, so "this is the one on" is one colour down the page. The grey
-   wash it had was the hover's neighbour, and the two read as one state. Navy ink on the wash
-   reads 11.3:1. */
-.choice[aria-checked='true'] {
-  background: var(--color-accent-surface);
-  color: var(--color-primary);
-  font-weight: var(--weight-semibold);
-}
-
-.dot {
-  border: 1.5px solid var(--color-border-control);
-  border-radius: 50%;
-  flex: none;
-  height: 0.875rem;
-  width: 0.875rem;
-}
-
-.choice[aria-checked='true'] .dot {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  box-shadow: inset 0 0 0 2.5px var(--color-surface);
-}
-
-.choice-note {
+.preseason-note {
   color: var(--color-text-subtle);
   font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-  font-weight: 400;
-  margin-left: auto;
   padding-left: var(--space-2);
   white-space: nowrap;
 }
 
-/* On the blue wash the note takes the row's navy: a grey there is the one cold spot on it. */
-.choice[aria-checked='true'] .choice-note {
+/* The line picked: washed in the blue the page's other single choice (the drop under My team) is
+   drawn in, with a Blue Line edge, so "this is the one on" is one colour down the page and is
+   not the hover's grey neighbour. Navy ink on the wash reads 11.3:1. */
+.preseason[aria-pressed='true'] {
+  background: var(--color-accent-surface);
+  box-shadow: inset 0 0 0 1.5px var(--color-accent);
   color: var(--color-primary);
+  font-weight: var(--weight-semibold);
+}
+
+/* The day picked: the same blue, filled, since a wash that pale is lost on a cell this small and
+   an edge alone is what the focus ring already draws. White on it reads 5.3:1. Its focus ring
+   stands a hair off the fill, so the two can be told apart. The class is doubled to outweigh
+   the plain day's own colours, which are written further down. */
+.day.day--picked,
+.day.day--picked:hover:enabled {
+  background: var(--color-accent);
+  color: var(--color-primary-contrast);
+  font-weight: var(--weight-semibold);
+}
+
+.day.day--picked:focus-visible {
+  outline-offset: 1px;
+}
+
+/* On the blue wash the note takes the row's navy: a grey there is the one cold spot on it. */
+.preseason[aria-pressed='true'] .preseason-note {
+  color: var(--color-primary);
+  font-weight: 400;
 }
 
 .divider {
   border-top: 1px solid var(--color-border);
-  margin: 0.3rem 0.5rem;
+  margin: 0.4rem 0 0.3rem;
 }
 
-/* The one line that is not an answer but a way on, to the picker: drawn as a link is, in Blue
-   Line (5.3:1 on the menu, 4.8:1 on its hover wash), so it does not read as a fifth choice. */
-.pick-day {
-  color: var(--color-accent);
-  font-weight: var(--weight-medium);
-}
-
-.pick-day:hover {
-  background: var(--color-accent-surface);
-}
-
-.pick-day app-icon {
-  flex: none;
-}
-
-/* The day typed, where the browser has no picker to show: the line "Pick a day" was, as a named
-   field, with the days there are under it. */
-.day-row {
+/* The month and the two arrows that turn it. */
+.month {
   align-items: center;
   display: flex;
-  font-size: var(--text-sm);
-  gap: 0.75rem;
   justify-content: space-between;
-  min-height: 2.5rem;
-  padding: 0.3rem 0.75rem;
 }
 
-.day-row-label {
-  color: var(--color-text-muted);
+.month-name {
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  margin: 0;
 }
 
-.day-input {
-  accent-color: var(--color-primary);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-control);
+.month-turn {
+  align-items: center;
+  background: none;
+  border: none;
   border-radius: var(--radius-sm);
-  color: var(--color-text);
-  font: inherit;
-  font-variant-numeric: tabular-nums;
-  min-height: 2rem;
-  padding: 0.2rem 0.5rem;
+  color: var(--color-primary);
+  cursor: pointer;
+  display: inline-flex;
+  height: 2.25rem;
+  justify-content: center;
+  width: 2.25rem;
 }
 
-.day-input:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
+.month-turn[aria-disabled='true'] {
+  color: var(--color-text-subtle);
+  cursor: default;
+  opacity: 0.4;
 }
 
-.day-input[aria-invalid='true'] {
-  border-color: var(--color-danger);
+/* The days: seven even columns, each cell a button as wide as its column. */
+.days {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
 }
 
-.range-note {
+.days th {
   color: var(--color-text-subtle);
   font-size: var(--text-xs);
-  line-height: 1.45;
-  margin: 0;
-  padding: 0.15rem 0.75rem 0.2rem;
+  font-weight: var(--weight-medium);
+  padding: 0.25rem 0 0.2rem;
+  text-align: center;
 }
 
-.range-note--outside {
-  color: var(--color-danger);
+.days td {
+  padding: 1px;
 }
 
-/* A finger's worth of line on a phone. */
+.day {
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-medium);
+  height: 2.125rem;
+  padding: 0;
+  width: 100%;
+}
+
+/* A day there is nothing to compare with: pale, and it does not answer. */
+.day:disabled {
+  color: var(--color-text-subtle);
+  cursor: default;
+  font-weight: 400;
+  opacity: 0.45;
+}
+
+/* Today is what every day is compared with, so it cannot be one of them, but it is where the
+   reader counts back from: a hairline ring on the pale figure. */
+.day--today:disabled {
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+  opacity: 1;
+}
+
+/* A finger's worth of cell on a phone. */
 @media (max-width: 640px) {
-  .choice,
-  .pick-day,
-  .day-row {
+  .menu {
+    width: 19.5rem;
+  }
+
+  .preseason {
     min-height: 2.75rem;
   }
 
-  .day-input {
-    min-height: 2.25rem;
+  .month-turn {
+    height: 2.75rem;
+    width: 2.75rem;
+  }
+
+  .day {
+    height: 2.625rem;
+  }
+
+  /* With a day on it the pill has the cross for an end, and the chevron is what the line cannot
+     afford: without it the pill, Risers and Fallers still sit on one line. */
+  .compare-btn--on .chevron {
+    display: none;
+  }
+
+  .compare-btn--on {
+    padding-right: 0.6rem;
+  }
+
+  /* The cross is the smallest thing on the line: a wider end to land on. */
+  .compare-clear {
+    padding-left: 0.55rem;
+    padding-right: 0.7rem;
   }
 }

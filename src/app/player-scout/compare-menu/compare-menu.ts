@@ -7,6 +7,7 @@ import {
   inject,
   Injector,
   input,
+  linkedSignal,
   output,
   signal,
   viewChild,
@@ -14,6 +15,7 @@ import {
 import { ScoutSince } from '../../api/models/scout-since';
 import { IconComponent } from '../../shared/icon/icon';
 import { PopoverTriggerDirective } from '../../shared/popover/popover-trigger.directive';
+import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 import { PLANNER_LAYOUT } from '../../streamer-planner/planner-page-size';
 
 /** Today as an ISO date in the reader's own clock, the way a date input writes one. */
@@ -22,7 +24,7 @@ export function localToday(): string {
   return isoDate(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-/** `days` before an ISO date, as an ISO date. */
+/** `days` before an ISO date, as an ISO date. A negative count is that many days after. */
 export function daysBefore(day: string, days: number): string {
   const [year, month, date] = day.split('-').map(Number);
   const then = new Date(year, month - 1, date - days);
@@ -36,22 +38,24 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000);
 }
 
-/**
- * The first of October of the season a day falls in: the floor of the day picker while no day is
- * kept yet. The regular season opens in the first week of October, so no earlier day is one of
- * the season's; the kept days, once there are any, set the real floor
- * ({@link CompareMenuComponent.earliest}).
- */
-export function seasonFloor(day: string): string {
-  const [year, month] = day.split('-').map(Number);
-  return `${month >= 9 ? year : year - 1}-10-01`;
-}
-
 function isoDate(year: number, monthIndex: number, date: number): string {
   return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
 }
 
 const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
+const LONG_DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long' });
+const MONTH = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' });
+
+/** The calendar's columns, Monday first: the week a fantasy matchup runs. */
+export const WEEKDAYS = [
+  { short: 'Mo', name: 'Monday' },
+  { short: 'Tu', name: 'Tuesday' },
+  { short: 'We', name: 'Wednesday' },
+  { short: 'Th', name: 'Thursday' },
+  { short: 'Fr', name: 'Friday' },
+  { short: 'Sa', name: 'Saturday' },
+  { short: 'Su', name: 'Sunday' },
+] as const;
 
 /** An ISO date as the page writes one: "7 Oct". */
 export function formatDay(day: string | null | undefined): string {
@@ -62,7 +66,7 @@ export function formatDay(day: string | null | undefined): string {
   return DAY.format(new Date(year, month - 1, date));
 }
 
-/** How long ago a day was, as the menu says it beside the date: "yesterday", "5 days ago". */
+/** How long ago a day was, as the button says it beside the date: "yesterday", "5 days ago". */
 export function relativeDay(day: string, today: string): string {
   const days = daysBetween(day, today);
   if (days === 1) {
@@ -74,9 +78,51 @@ export function relativeDay(day: string, today: string): string {
   return `${days} days ago`;
 }
 
+/** The month an ISO date falls in, as `YYYY-MM`. */
+export function monthOf(day: string): string {
+  return day.slice(0, 7);
+}
+
+/** A `YYYY-MM` month `by` months on (or back), as `YYYY-MM`. */
+export function shiftMonth(month: string, by: number): string {
+  const [year, index] = month.split('-').map(Number);
+  const then = new Date(year, index - 1 + by, 1);
+  return monthOf(isoDate(then.getFullYear(), then.getMonth(), 1));
+}
+
+/** A `YYYY-MM` month as the calendar heads it: "November 2026". */
+export function formatMonth(month: string): string {
+  const [year, index] = month.split('-').map(Number);
+  return MONTH.format(new Date(year, index - 1, 1));
+}
+
+/**
+ * A month as the calendar lays it out: six weeks of seven, Monday first, each place the ISO day
+ * that falls there or null outside the month. Always six, so the menu keeps its height from one
+ * month to the next.
+ */
+export function monthWeeks(month: string): (string | null)[][] {
+  const [year, index] = month.split('-').map(Number);
+  const lead = (new Date(year, index - 1, 1).getDay() + 6) % 7;
+  const length = new Date(year, index, 0).getDate();
+  return Array.from({ length: 6 }, (_, week) =>
+    Array.from({ length: 7 }, (_, weekday) => {
+      const date = week * 7 + weekday - lead + 1;
+      return date >= 1 && date <= length ? isoDate(year, index - 1, date) : null;
+    }),
+  );
+}
+
+/** The day of `month` with the same date as `day`, or the month's last where it has no such day. */
+function sameDayOf(month: string, day: string): string {
+  const [year, index] = month.split('-').map(Number);
+  const length = new Date(year, index, 0).getDate();
+  return isoDate(year, index - 1, Math.min(Number(day.slice(8)), length));
+}
+
 /**
  * The line under the control when the day on the button is not the day in the columns: nothing
- * to compare with at all, or a nearer day answered than the one asked for. The menu offers no
+ * to compare with at all, or a nearer day answered than the one asked for. The calendar offers no
  * day before the first kept, so the second is only a gap in the kept days (a night the snapshot
  * never ran), but it is a gap the reader cannot see, so the line stays.
  */
@@ -98,42 +144,46 @@ export function sinceCaption(answer: ScoutSince | null): string {
   return '';
 }
 
-/** One line of the menu: what the comparison can be with. */
-export interface CompareChoice {
-  /** `off`, `preseason`, or the ISO day. */
-  readonly key: string;
+/** One day of the calendar. */
+export interface CalendarDay {
+  readonly iso: string;
+  /** The day of the month, as the cell shows it. */
+  readonly date: number;
+  /** What a screen reader calls the cell: "15 October", with "today" on today's. */
   readonly label: string;
-  /** The grey note on the right: the date a day's words stand for. */
-  readonly note: string;
-  /** The day the choice stands for, null for the preseason; absent for off. */
-  readonly day?: string | null;
+  /** Whether there is a projection to compare with for the day. */
+  readonly offered: boolean;
   readonly picked: boolean;
+  readonly today: boolean;
 }
 
 /**
  * The comparison, as one menu button: "Projection Change" in rest (Alexander, 2026-11-13), the
  * sentence "Compare with · 15 Oct · 5 days ago" with a comparison on. The menu under it finishes
- * the sentence: nothing, yesterday, a week ago, the day last picked, the preseason, or a day of
- * the reader's own from the platform's date picker.
+ * the sentence with the two answers there are: the preseason, or a day of the reader's own, picked
+ * in a calendar that is the menu itself. A cross on the button switches the comparison off.
  *
- * <p>One button rather than the three segments it replaces (Alexander, 2026-10-20): "Off |
+ * <p>A calendar rather than the lines it replaces (Alexander, 2026-11-15): the menu listed
+ * Nothing, Yesterday, A week ago and the day last picked, with the reader's own day behind a
+ * "Pick a day" link that closed the menu and opened the browser's picker. The own day is what the
+ * comparison is for, and it was the farthest away: three presses over two surfaces. Now every
+ * day is one press in the menu, yesterday and a week ago among them, and "Nothing" is the cross,
+ * one press instead of two.
+ *
+ * <p>One button rather than the three segments before that (Alexander, 2026-10-20): "Off |
  * Preseason | 15 Oct" read as three values of one kind, where one was a switch and one a hidden
- * date field, and none of them said what the comparison does. The words do that here, and the
- * menu is the app's own (the editor's Stats and Ranking menus), not a control of its own.
+ * date field, and none of them said what the comparison does.
  *
- * <p>Nothing is picked for the reader. Opening the date picker changes nothing until a day is
- * picked in it: the day segment used to switch the comparison on against a week back on the
- * press that opened the picker, so dismissing the picker left a comparison with a day the reader
- * never chose.
+ * <p>Nothing is picked for the reader: opening the menu, or turning its months, changes nothing
+ * until a day is pressed.
  *
- * <p>Only a day that can be compared with is a line (Alexander, 2026-11-15): a day before the
- * first one on record used to be listed greyed out with "not kept" beside it and a footer saying
- * from when days are kept, which asked the reader to think about what is stored. The picker's
- * own limits say the same thing without the words.
+ * <p>Only a day that can be compared with can be pressed: the days before the first on record,
+ * and today itself, are drawn pale. Nothing says why in words, which asked the reader to think
+ * about what is stored; the months stop where the days do.
  */
 @Component({
   selector: 'app-compare-menu',
-  imports: [IconComponent, PopoverTriggerDirective],
+  imports: [IconComponent, PopoverTriggerDirective, TooltipDirective],
   templateUrl: './compare-menu.html',
   styleUrl: './compare-menu.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -146,36 +196,22 @@ export class CompareMenuComponent {
   readonly today = input<string>(localToday());
   /**
    * The first day a projection is kept for this season, as the BFF reports it, or null while it
-   * has not said (or none is kept). No earlier day is offered: the preseason line stands for
-   * everything before it, and has a line of its own.
+   * has not said (or none is kept). No earlier day can be pressed: the preseason line stands for
+   * everything before it.
    */
   readonly earliestKept = input<string | null>(null);
   /** The preseason (null) or a day picked, which also switches the comparison on. */
   readonly sinceChange = output<string | null>();
-  /** Nothing picked: the comparison switched off, the day kept for next time. */
+  /** The cross: the comparison switched off, the day kept for next time. */
   readonly cleared = output<void>();
 
-  private readonly field = viewChild.required<ElementRef<HTMLInputElement>>('field');
-  private readonly typed = viewChild<ElementRef<HTMLInputElement>>('typed');
-  private readonly trigger = viewChild.required(PopoverTriggerDirective);
+  private readonly opener = viewChild.required<ElementRef<HTMLButtonElement>>('opener');
   private readonly layout = inject(PLANNER_LAYOUT);
   private readonly injector = inject(Injector);
 
-  /**
-   * Whether "Pick a day" is a field in the menu instead of the platform's picker: set once the
-   * browser has shown it will not open one, and kept, since asking again would only fail again.
-   */
-  readonly typing = signal(false);
-  /** Whether the day last entered fell outside the days on record. */
-  readonly outside = signal(false);
+  readonly weekdays = WEEKDAYS;
 
-  /**
-   * The earliest day the picker offers: the first day kept, or, until one is, the season's first
-   * of October. Never before the season's start either way.
-   */
-  readonly earliest = computed(() => this.earliestKept() ?? seasonFloor(this.today()));
-
-  /** The latest: yesterday, since today's projection is the one everything is compared with. */
+  /** The latest day: yesterday, since today's projection is the one everything is compared with. */
   readonly latest = computed(() => daysBefore(this.today(), 1));
 
   /** No day to pick: the season has only just opened, or nothing is kept yet. */
@@ -184,53 +220,81 @@ export class CompareMenuComponent {
     return earliest === null || earliest > this.latest();
   });
 
+  /** Whether the preseason is what the comparison is with. */
+  readonly preseasonPicked = computed(() => this.on() && this.since() === null);
+
+  /** The day the comparison is with, or null: off, or the preseason. */
+  private readonly pickedDay = computed(() => (this.on() ? this.since() : null));
+
   /** Whether a projection is kept for a day: on or after the first kept, and before today. */
-  private kept(day: string): boolean {
+  private offered(day: string): boolean {
     const earliest = this.earliestKept();
     return earliest !== null && day >= earliest && day <= this.latest();
   }
 
-  /** The lines of the menu, the days latest first. */
-  readonly choices = computed<readonly CompareChoice[]>(() => {
-    const on = this.on();
+  /**
+   * The month the menu opens on: the day picked, or the day kept from last time while it can
+   * still be pressed, and otherwise the latest month with a day in it.
+   */
+  private readonly homeMonth = computed(() => {
     const since = this.since();
-    const today = this.today();
-    const yesterday = daysBefore(today, 1);
-    const weekAgo = daysBefore(today, 7);
-    const days = new Map<string, CompareChoice>();
-    // A day is a line only if it can be compared with. The one picked stays whatever the record
-    // says, so the menu never opens with no line marked.
-    const day = (iso: string, label: string) => {
-      const picked = on && since === iso;
-      if (picked || this.kept(iso)) {
-        days.set(iso, { key: iso, label, note: formatDay(iso), day: iso, picked });
-      }
-    };
-    day(yesterday, 'Yesterday');
-    day(weekAgo, 'A week ago');
-    // The day picked once stays a line of its own, so the reader can go between it and a week
-    // ago. Its words first and its date beside them, as on the two lines above.
-    if (since !== null && !days.has(since)) {
-      const ago = relativeDay(since, today);
-      day(since, ago.charAt(0).toUpperCase() + ago.slice(1));
-    }
-    return [
-      { key: 'off', label: 'Nothing', note: 'today only', picked: !on },
-      ...[...days.values()].sort((a, b) => b.key.localeCompare(a.key)),
-      {
-        key: 'preseason',
-        label: 'Preseason',
-        note: 'before game 1',
-        day: null,
-        picked: on && since === null,
-      },
-    ];
+    return monthOf(since !== null && (this.on() || this.offered(since)) ? since : this.latest());
   });
 
-  /** Under the typed field: the days there are, which is also what to do about one outside them. */
-  readonly range = computed(
-    () => `Pick a day from ${formatDay(this.earliest())} to ${formatDay(this.latest())}.`,
+  /** The month on show. Turned with the arrows, and back at {@link homeMonth} on each opening. */
+  readonly month = linkedSignal(() => this.homeMonth());
+
+  /** The first month to turn to: the first day on record, or the day picked if that is earlier. */
+  private readonly firstMonth = computed(() =>
+    [this.earliestKept(), this.pickedDay(), this.latest()]
+      .filter((day): day is string => day !== null)
+      .map(monthOf)
+      .reduce((first, month) => (month < first ? month : first), monthOf(this.latest())),
   );
+
+  readonly monthLabel = computed(() => formatMonth(this.month()));
+  readonly hasEarlier = computed(() => this.month() > this.firstMonth());
+  readonly hasLater = computed(() => this.month() < monthOf(this.latest()));
+
+  /** The month on show, as six weeks of days. */
+  readonly weeks = computed<readonly (CalendarDay | null)[][]>(() => {
+    const today = this.today();
+    const picked = this.pickedDay();
+    return monthWeeks(this.month()).map((week) =>
+      week.map((iso) => {
+        if (iso === null) {
+          return null;
+        }
+        const [year, month, date] = iso.split('-').map(Number);
+        const label = LONG_DAY.format(new Date(year, month - 1, date));
+        return {
+          iso,
+          date,
+          label: iso === today ? `${label}, today` : label,
+          offered: this.offered(iso),
+          picked: iso === picked,
+          today: iso === today,
+        };
+      }),
+    );
+  });
+
+  /** The day the arrows last moved to, while the menu is open. */
+  private readonly cursor = signal<string | null>(null);
+
+  /**
+   * The calendar's one tab stop: where the arrows last went, else the day picked, else the latest
+   * day of the month that can be pressed. Null in a month with none.
+   */
+  readonly tabStop = computed(() => {
+    const days = this.weeks()
+      .flat()
+      .filter((day): day is CalendarDay => day !== null && day.offered);
+    const cursor = this.cursor();
+    const stop =
+      days.find((day) => day.iso === cursor) ?? days.find((day) => day.picked) ?? days.at(-1);
+    return stop?.iso ?? null;
+  });
 
   /** What the button says after "Compare with" while a comparison is on: the day and how long ago. */
   readonly value = computed(() => {
@@ -252,104 +316,72 @@ export class CompareMenuComponent {
     return since === null ? 'vs preseason' : `vs ${formatDay(since)}`;
   });
 
-  pick(choice: CompareChoice, menu: PopoverTriggerDirective): void {
-    this.outside.set(false);
+  /** The button pressed, to open or to close: the calendar starts over from its home month. */
+  startOver(): void {
+    this.month.set(this.homeMonth());
+    this.cursor.set(null);
+  }
+
+  /** A day pressed, or the preseason (null): the comparison is with it, and the menu closes. */
+  pick(day: string | null, menu: PopoverTriggerDirective): void {
     menu.close();
-    if (choice.key === 'off') {
-      this.cleared.emit();
-    } else {
-      this.sinceChange.emit(choice.day ?? null);
+    this.sinceChange.emit(day);
+  }
+
+  /**
+   * The cross. It leaves the page with the comparison, so focus goes to the button it sat on
+   * rather than nowhere.
+   */
+  clear(): void {
+    this.cleared.emit();
+    this.opener().nativeElement.focus();
+  }
+
+  /** A month back or on, no further than the days there are. */
+  turn(by: -1 | 1): void {
+    if (by < 0 ? this.hasEarlier() : this.hasLater()) {
+      this.month.update((month) => shiftMonth(month, by));
+      this.cursor.set(null);
     }
   }
 
   /**
-   * The arrows walk the lines, round the ends, and Home and End reach them, as in any radio
-   * group. They only move: a line is picked with Enter or Space, since picking closes the menu
-   * and reloads the list, which is no thing to do on the way past.
+   * The arrows walk the days, a day or a week at a time, Home and End reach the ends of the week
+   * and Page Up and Page Down the same day a month away, as in any date grid. They stop at the
+   * first and last day that can be pressed, turn the month when they cross its edge, and only
+   * move: a day is picked with Enter or Space, since picking closes the menu and reloads the list.
    */
-  onArrow(event: KeyboardEvent): void {
-    const lines = [
-      ...(event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="radio"]'),
-    ];
-    const at = lines.indexOf(event.target as HTMLElement);
-    const last = lines.length - 1;
-    const to = new Map<string, number>([
-      ['ArrowDown', at === last ? 0 : at + 1],
-      ['ArrowRight', at === last ? 0 : at + 1],
-      ['ArrowUp', at <= 0 ? last : at - 1],
-      ['ArrowLeft', at <= 0 ? last : at - 1],
-      ['Home', 0],
-      ['End', last],
+  onDayKey(event: KeyboardEvent): void {
+    const from = (event.target as HTMLElement).dataset['day'];
+    const earliest = this.earliestKept();
+    if (!from || earliest === null) {
+      return;
+    }
+    // 2024-01-01 was a Monday: the place in the week, Monday as 0.
+    const weekday = daysBetween('2024-01-01', from) % 7;
+    const moved = new Map<string, () => string>([
+      ['ArrowLeft', () => daysBefore(from, 1)],
+      ['ArrowRight', () => daysBefore(from, -1)],
+      ['ArrowUp', () => daysBefore(from, 7)],
+      ['ArrowDown', () => daysBefore(from, -7)],
+      ['Home', () => daysBefore(from, weekday)],
+      ['End', () => daysBefore(from, weekday - 6)],
+      ['PageUp', () => sameDayOf(shiftMonth(monthOf(from), -1), from)],
+      ['PageDown', () => sameDayOf(shiftMonth(monthOf(from), 1), from)],
     ]).get(event.key);
-    if (to === undefined) {
+    if (!moved) {
       return;
     }
     event.preventDefault();
-    lines[to]?.focus();
-  }
-
-  /**
-   * "Pick a day": the platform's date picker opens on the button, where the field hides, and the
-   * menu closes behind it. Nothing changes until a day is picked in it ({@link onDate}). A
-   * browser that will not open one (none to show, or no user activation) leaves the menu open
-   * and turns the line into a field to type the day into.
-   */
-  pickDay(menu: PopoverTriggerDirective): void {
-    this.outside.set(false);
-    const field = this.field().nativeElement;
-    try {
-      if (typeof field.showPicker === 'function') {
-        field.showPicker();
-        menu.close();
-        return;
-      }
-    } catch {
-      // Fall through to the typed field.
-    }
-    this.typeTheDay();
-  }
-
-  /**
-   * A day picked in the platform's picker. Its limits keep it to the days on record; a browser
-   * that lets one through anyway gets the menu back with the typed field and the days there are,
-   * rather than a pick that did nothing.
-   */
-  onDate(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    if (!value) {
-      return;
-    }
-    if (this.onRecord(value)) {
-      this.sinceChange.emit(value);
-      return;
-    }
-    this.outside.set(true);
-    this.trigger().open();
-    this.typeTheDay();
-  }
-
-  /** A day typed into the menu's own field. */
-  onTyped(event: Event, menu: PopoverTriggerDirective): void {
-    const value = (event.target as HTMLInputElement).value;
-    if (!value) {
-      this.outside.set(false);
-      return;
-    }
-    if (!this.onRecord(value)) {
-      this.outside.set(true);
-      return;
-    }
-    this.outside.set(false);
-    menu.close();
-    this.sinceChange.emit(value);
-  }
-
-  private onRecord(day: string): boolean {
-    return day >= this.earliest() && day <= this.latest();
-  }
-
-  private typeTheDay(): void {
-    this.typing.set(true);
-    afterNextRender(() => this.typed()?.nativeElement.focus(), { injector: this.injector });
+    const target = moved();
+    const latest = this.latest();
+    const held = target > latest ? latest : target;
+    const to = held < earliest ? earliest : held;
+    const grid = event.currentTarget as HTMLElement;
+    this.month.set(monthOf(to));
+    this.cursor.set(to);
+    afterNextRender(() => grid.querySelector<HTMLElement>(`[data-day="${to}"]`)?.focus(), {
+      injector: this.injector,
+    });
   }
 }
