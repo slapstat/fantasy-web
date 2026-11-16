@@ -208,6 +208,9 @@ export const SCOUT_RANKED_ORDER: ScoutSort = RANKED_ORDER;
  */
 export const SCOUT_ADJUSTED_ORDER: ScoutSort = { key: 'adjusted', descending: true };
 
+/** The order a drop picked sets: the pickups that gain the lineup most over him first. */
+export const SCOUT_GAIN_ORDER: ScoutSort = { key: 'gain', descending: true };
+
 /** The order the page opens in: the players the model makes the most more of since the day. */
 export const SCOUT_MOVERS_ORDER: ScoutSort = { key: 'delta', descending: true };
 

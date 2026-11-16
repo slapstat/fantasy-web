@@ -143,7 +143,7 @@
              since the page is for the league and the roster is the follow-up question. A full roster
              asks which player goes: the line offers the few a drop would usually be, and the list
              prices every pickup against the one chosen. -->
-        <section class="room-box" aria-label="Room for a pickup">
+        <section #roomBox class="room-box" aria-label="Room for a pickup">
           <div class="room-line">
             <div class="room-text">
               @switch (teamStatus()) {
@@ -400,6 +400,18 @@
            away. One button that reads as a sentence; with a comparison on, the two ways the
            projection moved beside it, either one pressed or neither. -->
       <div class="list">
+        <!-- The drop picked, held on screen while the list scrolls, since every gain under it is
+             set against him: who he is, what his going costs, a way back to the roster to pick
+             another, and a way out. -->
+        @if (drop(); as picked) {
+          <app-swap-bar
+            [name]="picked.player.name"
+            [loss]="dropLoss()"
+            [unit]="scoringType() === 'points' ? 'points' : 'Z-Score'"
+            (pickAnother)="changeDrop()"
+            (cleared)="clearDrop()"
+          />
+        }
         <div class="compare-line">
           <app-compare-menu
             [on]="compare()"
