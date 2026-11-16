@@ -589,6 +589,24 @@ describe('PlayerScoutComponent', () => {
     expect(page.pageCount()).toBe(2);
   });
 
+  it("counts the toolbar's answer on the list's top line, not the page shown", async () => {
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    const total = () => ngMocks.formatText(ngMocks.find(fixture, '.compare-line .list-total'));
+    expect(total()).toBe('23 players');
+
+    page.pool.set('all');
+    fixture.detectChanges();
+    expect(total()).toBe(`${page.filtered().length} players`);
+    expect(page.filtered().length).toBeGreaterThan(SCOUT_PAGE_SIZE);
+
+    page.search.set('player 1');
+    fixture.detectChanges();
+    expect(total()).toBe(
+      `${page.filtered().length} ${page.filtered().length === 1 ? 'player' : 'players'}`,
+    );
+  });
+
   it('sorts the whole list by a column before paging it, and falls back when the column leaves', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
