@@ -619,6 +619,24 @@ describe('PlayerScoutComponent', () => {
     expect(page.pageCount()).toBe(2);
   });
 
+  it("counts the toolbar's answer on the list's top line, not the page shown", async () => {
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    const total = () => ngMocks.formatText(ngMocks.find(fixture, '.compare-line .list-total'));
+    expect(total()).toBe('23 players');
+
+    page.pool.set('all');
+    fixture.detectChanges();
+    expect(total()).toBe(`${page.filtered().length} players`);
+    expect(page.filtered().length).toBeGreaterThan(SCOUT_PAGE_SIZE);
+
+    page.search.set('player 1');
+    fixture.detectChanges();
+    expect(total()).toBe(
+      `${page.filtered().length} ${page.filtered().length === 1 ? 'player' : 'players'}`,
+    );
+  });
+
   it('sorts the whole list by a column before paging it, and falls back when the column leaves', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
@@ -670,7 +688,7 @@ describe('PlayerScoutComponent', () => {
     expect(myTeam).toHaveBeenCalledWith('YAHOO', '465.l.9');
   });
 
-  it('opens on suggested drops, the roster folded, with nobody chosen and no gain column', async () => {
+  it('opens on suggested drops, the roster folded, with nobody chosen and each pickup priced as if a spot were free', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
 
@@ -680,8 +698,9 @@ describe('PlayerScoutComponent', () => {
     // spot: the C on injured reserve scores lowest but holds none.
     expect(page.dropCandidates()[0]?.player.playerId).toBe('203');
     expect(page.drop()).toBeNull();
-    expect(page.gains()).toBeNull();
-    expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'gains')).toBeNull();
+    expect(page.gains()).not.toBeNull();
+    expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'gains')).toBe(page.gains());
+    expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'dropName')).toBe('');
     expect(page.valuation()?.byPlayer.get('203')?.starts).toBe(10);
     const floor = ngMocks.find(fixture, '.floor');
     expect(ngMocks.formatText(floor)).toContain('Suggested drops');
@@ -689,7 +708,7 @@ describe('PlayerScoutComponent', () => {
     const chipText = (selector: string) =>
       chips.map((chip) => ngMocks.formatText(ngMocks.find(chip, selector)));
     expect(chipText('.pill-name')).toEqual(['Mine 203', 'Mine 202', 'Mine 210', 'Mine 207']);
-    expect(chipText('.pill-cost')).toEqual(['5.0', '7.0', '11.0', '70.0']);
+    expect(chipText('.pill-cost')).toEqual(['-5.0', '-7.0', '-11.0', '-70.0']);
     expect(chips.map((chip) => chip.attributes['aria-checked'])).toEqual([
       'false',
       'false',
@@ -787,10 +806,12 @@ describe('PlayerScoutComponent', () => {
     // A fifth chip, since he is none of the four cheapest.
     expect(ngMocks.findAll(fixture, '.pill--drop')).toHaveLength(5);
 
-    // Pressing the one picked lets him go, and the gain column with him.
+    // Pressing the one picked lets him go, and the gains go back to a spot free.
+    const against = page.gains();
     page.pickDrop('201');
     expect(page.drop()).toBeNull();
-    expect(page.gains()).toBeNull();
+    expect(page.gains()).not.toBe(against);
+    expect(page.gains()).not.toBeNull();
 
     // A pick that is not on the roster, as after a league change, chooses nobody.
     page.pickDrop('nobody');
@@ -884,7 +905,7 @@ describe('PlayerScoutComponent', () => {
       'Mine 207',
     ]);
     expect(ngMocks.formatText(chips[2])).toContain('Streamer');
-    expect(ngMocks.formatText(ngMocks.find(chips[2], '.pill-cost'))).toBe('68.0');
+    expect(ngMocks.formatText(ngMocks.find(chips[2], '.pill-cost'))).toBe('-68.0');
 
     // Dropped for the best free centre, the spot becomes a hold: his 7 a game in it, 0.2 more
     // than the stream it no longer makes, rather than 6.5 more than the streamer's own 0.5.
@@ -993,6 +1014,10 @@ describe('PlayerScoutComponent', () => {
     expect(page.dropCandidates()[0]?.player.playerId).toBe('403');
     expect(page.valuation()?.byPlayer.get('403')?.marginal).toBe(0);
     expect(page.valuation()?.byPlayer.get('404')?.marginal).toBe(20);
+    // Before a drop, what each adds with a spot free: as against the benched centre, who costs
+    // nothing to let go.
+    expect(page.gains()?.get('99')).toBeCloseTo(30);
+    expect(page.gains()?.get('98')).toBeCloseTo(0);
     page.pickDrop('403');
     // The available D replaces the lone D for a gain; the available C cannot start, so dropping
     // the benched centre for him gains nothing.
@@ -1047,12 +1072,13 @@ describe('PlayerScoutComponent', () => {
     expect(page.valuation()?.byPlayer.get('502')?.starts).toBe(1);
   });
 
-  it('sorts the whole list by the gain, not the page, and offers the column only with a drop', async () => {
+  it('sorts the whole list by the gain, not the page, and leaves the order alone until a drop is picked', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
 
     page.pool.set('all');
-    expect(page.gains()).toBeNull();
+    expect(page.gains()?.size).toBe(23);
+    expect(page.sort().key).not.toBe('gain');
     page.pickDrop('203');
     // Two pages, every available player priced whether on screen or not.
     expect(page.pageCount()).toBe(2);
@@ -1066,7 +1092,7 @@ describe('PlayerScoutComponent', () => {
     );
   });
 
-  it('offers neither a drop nor a gain column while a pickup costs nobody', async () => {
+  it('offers no drop while a pickup costs nobody, and prices each pickup into the free spot', async () => {
     settings = {
       ...SETTINGS,
       rosterSlots: { ...SETTINGS.rosterSlots, bn: 1 },
@@ -1076,7 +1102,8 @@ describe('PlayerScoutComponent', () => {
 
     expect(page.room().openSpots).toBe(1);
     expect(page.fullRoster()).toBe(false);
-    expect(page.gains()).toBeNull();
+    expect(page.drop()).toBeNull();
+    expect(page.gains()).not.toBeNull();
     expect(ngMocks.findAll(fixture, '.pill--drop')).toHaveLength(0);
     expect(ngMocks.formatText(fixture)).toContain('1 open roster spot');
   });
@@ -1138,7 +1165,7 @@ describe('PlayerScoutComponent', () => {
       .findAll(fixture, '.pill--drop')
       .find((chip) => chip.attributes['aria-checked'] === 'true')!;
     expect(ngMocks.formatText(ngMocks.find(chosen, '.pill-name'))).toBe('Mine 203');
-    expect(ngMocks.formatText(ngMocks.find(chosen, '.pill-cost'))).toBe('5.0');
+    expect(ngMocks.formatText(ngMocks.find(chosen, '.pill-cost'))).toBe('-5.0');
     expect(ngMocks.formatText(ngMocks.find(chosen, '.drop-tag--out'))).toBe('O');
   });
 

@@ -18,120 +18,131 @@
     </div>
 
     @if (league()) {
-      <!-- Which rows: whose players, as Yahoo's player list asks it (by status or one team), at
-           which positions, from which NHL club, the user's own beside them, or one by name. One
-           toolbar, since they are all the same question. -->
+      <!-- Which rows, asked as two questions, a line each, so the controls that answer one stand
+           together rather than seven in a row that breaks wherever the width runs out. The first
+           line is whose players: one by name, by status or team as Yahoo's player list asks it,
+           and the user's own beside them. The second is which of them: positions, NHL club and
+           lineup role. -->
       <div class="toolbar">
-        <label class="field field--pool">
-          <span class="field-label">Show</span>
-          <select aria-label="Whose players to show" [value]="pool()" (change)="onPool($event)">
-            <optgroup label="By status">
-              <option value="available">Available players</option>
-              <option value="fa">Free agents only</option>
-              <option value="waivers">On waivers only</option>
-              <option value="taken">Taken players</option>
-              <option value="all">All players</option>
-            </optgroup>
-            @if (leagueTeams().length > 0) {
-              <optgroup label="By team">
-                @for (team of leagueTeams(); track team.pool) {
-                  <option [value]="team.pool">
-                    {{ team.mine ? 'My team: ' + team.name : team.name }}
-                  </option>
-                }
+        <div class="toolbar-row toolbar-row--whose">
+          <label class="search">
+            <app-icon name="search" [size]="16" />
+            <input
+              class="search-input"
+              type="search"
+              placeholder="Search players"
+              aria-label="Search players"
+              [value]="search()"
+              (input)="onSearch($event)"
+            />
+          </label>
+          <label class="field field--pool">
+            <span class="field-label">Show</span>
+            <select aria-label="Whose players to show" [value]="pool()" (change)="onPool($event)">
+              <optgroup label="By status">
+                <option value="available">Available players</option>
+                <option value="fa">Free agents only</option>
+                <option value="waivers">On waivers only</option>
+                <option value="taken">Taken players</option>
+                <option value="all">All players</option>
               </optgroup>
-            }
-          </select>
-        </label>
-        <!-- Skaters and goalies are one list, as the planner's is: "All" is everyone, "All
-             skaters" picks the four skater positions in one press, and G is the goalies. -->
-        <div class="pills" role="group" aria-label="Positions to show">
-          <button
-            type="button"
-            class="pill"
-            [class.pill--active]="positions().size === 0"
-            [attr.aria-pressed]="positions().size === 0"
-            (click)="clearPositions()"
-          >
-            All
-          </button>
-          <button
-            type="button"
-            class="pill"
-            [class.pill--active]="allSkaters()"
-            [attr.aria-pressed]="allSkaters()"
-            (click)="toggleAllSkaters()"
-          >
-            <!-- "Skaters" on a phone, so the seven positions keep to one line. -->
-            <span class="pill-wide">All skaters</span
-            ><span class="pill-narrow" aria-hidden="true">Skaters</span>
-          </button>
-          @for (option of positionOptions; track option) {
+              @if (leagueTeams().length > 0) {
+                <optgroup label="By team">
+                  @for (team of leagueTeams(); track team.pool) {
+                    <option [value]="team.pool">
+                      {{ team.mine ? 'My team: ' + team.name : team.name }}
+                    </option>
+                  }
+                </optgroup>
+              }
+            </select>
+          </label>
+          <label class="tick" [class.tick--moot]="poolShowsMine()">
+            <input
+              type="checkbox"
+              [checked]="showMine() || poolShowsMine()"
+              [disabled]="poolShowsMine() || teamStatus() !== 'ready'"
+              (change)="toggleShowMine()"
+            />
+            Show my team
+          </label>
+        </div>
+        <div class="toolbar-row toolbar-row--which">
+          <!-- Skaters and goalies are one list, as the planner's is: "All" is everyone, "All
+             skaters" picks the four skater positions in one press, and G is the goalies. One
+             segmented control rather than seven loose pills, with a rule before the skater
+             positions and another before the goalies, so its three kinds of answer read apart. -->
+          <div class="segments" role="group" aria-label="Positions to show">
             <button
               type="button"
-              class="pill"
-              [class.pill--active]="positions().has(option)"
-              [attr.aria-pressed]="positions().has(option)"
-              (click)="togglePosition(option)"
+              class="pill segment"
+              [class.pill--active]="positions().size === 0"
+              [attr.aria-pressed]="positions().size === 0"
+              (click)="clearPositions()"
             >
-              {{ option }}
+              All
             </button>
-          }
-        </div>
-        <label class="field">
-          <span class="field-label">Club</span>
-          <select aria-label="NHL club" [value]="nhlTeam() ?? ''" (change)="onNhlTeam($event)">
-            <option value="">All clubs</option>
-            @for (club of nhlTeams(); track club) {
-              <option [value]="club">{{ club }}</option>
+            <button
+              type="button"
+              class="pill segment"
+              [class.pill--active]="allSkaters()"
+              [attr.aria-pressed]="allSkaters()"
+              (click)="toggleAllSkaters()"
+            >
+              <!-- "Skaters" on a phone, so the seven positions keep to one line. -->
+              <span class="pill-wide">All skaters</span
+              ><span class="pill-narrow" aria-hidden="true">Skaters</span>
+            </button>
+            @for (option of positionOptions; track option; let first = $first) {
+              @if (first || option === 'G') {
+                <span class="segment-rule" aria-hidden="true"></span>
+              }
+              <button
+                type="button"
+                class="pill segment"
+                [class.pill--active]="positions().has(option)"
+                [attr.aria-pressed]="positions().has(option)"
+                (click)="togglePosition(option)"
+              >
+                {{ option }}
+              </button>
             }
-          </select>
-        </label>
-        <!-- Who today's Daily Faceoff page lists on a line, pair or unit. One role at a time, as
+          </div>
+          <label class="field">
+            <span class="field-label">Club</span>
+            <select aria-label="NHL club" [value]="nhlTeam() ?? ''" (change)="onNhlTeam($event)">
+              <option value="">All clubs</option>
+              @for (club of nhlTeams(); track club) {
+                <option [value]="club">{{ club }}</option>
+              }
+            </select>
+          </label>
+          <!-- Who today's Daily Faceoff page lists on a line, pair or unit. One role at a time, as
              Club is one club: the groups are the page's own. -->
-        <label class="field">
-          <span class="field-label">Lineup</span>
-          <select
-            aria-label="Lineup role"
-            [value]="lineupRole() ?? ''"
-            [disabled]="!lineupSeenOn()"
-            [appTooltip]="
-              lineupSeenOn()
-                ? 'Daily Faceoff lineups, read ' + lineupSeenOn()
-                : 'No lineup page could be read today'
-            "
-            (change)="onLineupRole($event)"
-          >
-            <option value="">Any role</option>
-            @for (group of lineupRoleGroups; track group.label) {
-              <optgroup [label]="group.label">
-                @for (option of group.roles; track option.role) {
-                  <option [value]="option.role">{{ option.label }}</option>
-                }
-              </optgroup>
-            }
-          </select>
-        </label>
-        <label class="tick" [class.tick--moot]="poolShowsMine()">
-          <input
-            type="checkbox"
-            [checked]="showMine() || poolShowsMine()"
-            [disabled]="poolShowsMine() || teamStatus() !== 'ready'"
-            (change)="toggleShowMine()"
-          />
-          Show my team
-        </label>
-        <label class="search">
-          <app-icon name="search" [size]="16" />
-          <input
-            class="search-input"
-            type="search"
-            placeholder="Search players"
-            aria-label="Search players"
-            [value]="search()"
-            (input)="onSearch($event)"
-          />
-        </label>
+          <label class="field">
+            <span class="field-label">Lineup</span>
+            <select
+              aria-label="Lineup role"
+              [value]="lineupRole() ?? ''"
+              [disabled]="!lineupSeenOn()"
+              [appTooltip]="
+                lineupSeenOn()
+                  ? 'Daily Faceoff lineups, read ' + lineupSeenOn()
+                  : 'No lineup page could be read today'
+              "
+              (change)="onLineupRole($event)"
+            >
+              <option value="">Any role</option>
+              @for (group of lineupRoleGroups; track group.label) {
+                <optgroup [label]="group.label">
+                  @for (option of group.roles; track option.role) {
+                    <option [value]="option.role">{{ option.label }}</option>
+                  }
+                </optgroup>
+              }
+            </select>
+          </label>
+        </div>
       </div>
     }
 
@@ -212,7 +223,7 @@
                                     chip.player.injuryStatus ?? 'Out'
                                   }}</span>
                                 }
-                                <span class="pill-cost">{{ dropCost(chip) }}</span>
+                                <span class="pill-cost">{{ dropLossText(chip) }}</span>
                               </button>
                             }
                           </div>
@@ -450,6 +461,13 @@
                 Fallers
               </button>
             </div>
+          }
+          <!-- How many players the toolbar's answer holds, at the right of the line under it, so
+               every filter pressed shows its effect at once and the line is not a lone button. -->
+          @if (!failure() && !loading() && !outOfSeason() && filtered().length > 0) {
+            <span class="list-total" aria-live="polite">
+              {{ filtered().length }} {{ filtered().length === 1 ? 'player' : 'players' }}
+            </span>
           }
           <!-- How the list is ranked: by the score, or by the score over the best player at each
                position the league leaves unstarted, which is what a spot in its lineup is worth.

@@ -876,9 +876,13 @@ export interface DropPricing {
  * <p>A streamer dropped for a pickup turns his spot into a hold: the lineup keeps its players,
  * gains the pickup and has one spot fewer on every night, so what the swap costs is the spot's
  * season, not the streamer's own projection.
+ *
+ * <p>No drop prices each pickup as if a roster spot were free for him: what he adds to the lineup
+ * as it stands, the mirror of what a drop costs it, so the two can be read side by side before
+ * the reader has chosen whom to let go.
  */
 export function priceDrop(
-  drop: TeamPlayer,
+  drop: TeamPlayer | null,
   team: readonly TeamPlayer[],
   slots: RosterSlots,
   schedule: ReadonlyMap<string, readonly string[]>,
@@ -894,13 +898,20 @@ export function priceDrop(
   const planning: Planning = { team, slots, seats, schedule, score, weights, streaming };
   const pool = streams(team, held.size, streaming, schedule, weights);
   const spots = filled(pool, players, planning);
-  const streamerDropped = held.has(drop.playerId);
-  const without = streamerDropped
-    ? players
-    : players.filter((player) => player.playerId !== drop.playerId);
-  const freed = streamerDropped ? oneFewer(pool) : withoutReturn(pool, drop.playerId);
+  const streamerDropped = drop !== null && held.has(drop.playerId);
+  const without =
+    drop === null || streamerDropped
+      ? players
+      : players.filter((player) => player.playerId !== drop.playerId);
+  let freed = pool;
+  if (streamerDropped) {
+    freed = oneFewer(pool);
+  } else if (drop !== null) {
+    freed = withoutReturn(pool, drop.playerId);
+  }
   const after = freed === pool ? spots : filled(freed, without, planning);
-  const dropped = players.find((player) => player.playerId === drop.playerId);
+  const dropped =
+    drop === null ? undefined : players.find((player) => player.playerId === drop.playerId);
   const base = new Map<string, number>();
   const asItStands = (date: string): number => {
     let value = base.get(date);

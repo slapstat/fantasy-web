@@ -439,10 +439,25 @@ describe('ScoutTableComponent', () => {
     expect(sorted[0].nativeElement.getAttribute('aria-sort')).toBe('ascending');
   });
 
-  it('has no gain columns without a drop', () => {
+  it('has no lineup column without gains', () => {
     const none = render([row(1, 'Brandon Montour', 1)]);
     expect(ngMocks.findAll(none, '.gain-col, .score-gain-col, .player-gains')).toHaveLength(0);
     expect(ngMocks.findAll(none, '.heading-sub')).toHaveLength(0);
+  });
+
+  it('heads the lineup column "if added" before a drop is chosen, and sets no projection against one', () => {
+    const fixture = render([row(1, 'Brandon Montour', 1)], {
+      gains: new Map<string, number | null>([['1', 41.2]]),
+    });
+
+    const heading = ngMocks.find(fixture, 'th.gain-col');
+    expect(ngMocks.formatText(heading)).toBe('Lineup if added');
+    expect(heading.nativeElement.classList).toContain('stat-col--start');
+    expect(ngMocks.findAll(fixture, '.score-gain-col')).toHaveLength(0);
+    expect(ngMocks.formatText(ngMocks.find(fixture, 'td.gain-col'))).toBe('+41.2');
+    expect(
+      ngMocks.findAll(fixture, '.player-gain').map((line) => ngMocks.formatText(line)),
+    ).toEqual(['Lineup +41.2']);
   });
 
   it('heads a sortable gain column by the drop, each gain inked by its sign, the three biggest washed in green and a pickup it could not price as a question', () => {
