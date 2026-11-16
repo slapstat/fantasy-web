@@ -61,10 +61,16 @@
   flex: 0 1 auto;
 }
 
-/* Which rows, in one toolbar: whose players, at which positions, from which club, the user's
-   own beside them, and a name. The search sits at the end and takes the room that is left, so
-   the row is full at every width rather than a hole with a box at its far side. */
+/* Which rows, as two lines that each answer one question: whose players, then which of them.
+   A line breaks where its question does, not where the width runs out; inside a line the gap
+   between controls is wide, so each control and its label read as one. */
 .toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.toolbar-row {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
@@ -99,8 +105,14 @@ select,
   padding: var(--space-1) var(--space-2);
 }
 
+/* One focus ring for every control the page draws itself. */
 select:focus-visible,
-.search-input:focus-visible {
+.search-input:focus-visible,
+.pill:focus-visible,
+.mover:focus-visible,
+.roster-toggle:focus-visible,
+.drop-pick input:focus-visible,
+.roster-more:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
 }
@@ -109,13 +121,12 @@ select:focus-visible,
   max-width: 16rem;
 }
 
+/* The quickest way to one player, so it leads the first line. */
 .search {
   align-items: center;
   color: var(--color-text-subtle);
   display: inline-flex;
-  flex: 1 1 11rem;
-  margin-left: auto;
-  max-width: 16rem;
+  flex: 0 1 18rem;
   min-width: 11rem;
   position: relative;
 }
@@ -155,13 +166,6 @@ select:focus-visible,
   cursor: default;
 }
 
-.pills {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
 .pill {
   background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
@@ -183,9 +187,29 @@ select:focus-visible,
   background: var(--color-surface-hover);
 }
 
-.pill:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
+/* The positions as one segmented control: a single track, the pressed answers filled, a thin
+   rule setting the skater positions apart from All and the goalies apart from them. */
+.segments {
+  align-items: center;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+}
+
+.segment {
+  background: transparent;
+  border-color: transparent;
+}
+
+.segment-rule {
+  background: var(--color-border-strong);
+  flex: none;
+  height: 0.875rem;
+  margin: 0 var(--space-1);
+  width: 1px;
 }
 
 /* The short label for a phone; a wide screen has room for the whole one. */
@@ -254,11 +278,6 @@ select:focus-visible,
   flex: none;
 }
 
-.mover:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
-}
-
 .mover--risers {
   border-color: var(--color-success);
   color: var(--color-success);
@@ -291,6 +310,16 @@ select:focus-visible,
    comparison, so it stays when the comparison is off. */
 .adjust-toggle {
   margin-left: auto;
+}
+
+/* The count at the line's right end, the ranking switch beside it when offered. */
+.list-total {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.list-total + .adjust-toggle {
+  margin-left: 0;
 }
 
 /* Nothing to compare with yet: a line of its own under the controls, the line's footnote. */
@@ -471,11 +500,6 @@ select:focus-visible,
   padding: var(--space-1) 0;
 }
 
-.roster-toggle:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
-}
-
 .roster-toggle .chevron {
   color: var(--color-text-subtle);
   transition: transform var(--transition-fast);
@@ -569,11 +593,6 @@ select:focus-visible,
   cursor: default;
 }
 
-.drop-pick input:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
-}
-
 /* The players on injured reserve under a line of their own: no spot of theirs can be freed. */
 .roster-divider td {
   color: var(--color-text-muted);
@@ -593,11 +612,6 @@ select:focus-visible,
   font-weight: var(--weight-semibold);
   margin-top: var(--space-2);
   padding: var(--space-1) 0;
-}
-
-.roster-more:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
 }
 
 /* On a phone the roster keeps the player, his starts and his cost, with the player pinned while
@@ -774,18 +788,19 @@ select:focus-visible,
     margin-bottom: var(--space-3);
   }
 
-  /* The toolbar in three lines: the search and whose players, the quickest way to a player and
-     the question that sets the list; the positions; the club and the user's own. */
+  /* The same two questions, tighter: the search and whose players side by side with the user's
+     own under them; the positions across the width, the club and the role under them. */
   .toolbar {
+    gap: var(--space-3);
+  }
+
+  .toolbar-row {
     gap: var(--space-2);
   }
 
   .search {
     flex: 1 1 45%;
-    margin-left: 0;
-    max-width: none;
     min-width: 0;
-    order: -2;
   }
 
   .field {
@@ -796,10 +811,11 @@ select:focus-visible,
   /* Whose players beside the search, its label left to the select's own name. */
   .field--pool {
     flex: 1 1 50%;
-    order: -1;
   }
 
-  .field--pool .field-label {
+  /* Out of the layout, still the select's and the button's name. */
+  .field--pool .field-label,
+  .pill-wide {
     clip: rect(0 0 0 0);
     height: 1px;
     overflow: hidden;
@@ -814,26 +830,14 @@ select:focus-visible,
     min-width: 0;
   }
 
-  .toolbar .pills {
+  .segments {
+    display: flex;
     flex: 1 1 100%;
-    gap: var(--space-1);
   }
 
-  .toolbar .pill {
+  .segment {
+    flex: 1 1 auto;
     padding: var(--space-1) var(--space-2);
-  }
-
-  /* Out of the layout, still the button's name. */
-  .pill-wide {
-    clip: rect(0 0 0 0);
-    height: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
-    width: 1px;
-  }
-
-  .toolbar .pill {
     position: relative;
   }
 
