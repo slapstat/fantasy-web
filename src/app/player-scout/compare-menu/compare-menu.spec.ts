@@ -9,7 +9,6 @@ import {
   daysBefore,
   daysBetween,
   formatDay,
-  relativeDay,
   shiftMonth,
   formatMonth,
   monthOf,
@@ -35,12 +34,6 @@ describe('the day arithmetic', () => {
   it('writes a day as the page does', () => {
     expect(formatDay('2026-10-07')).toBe('7 Oct');
     expect(formatDay(null)).toBe('');
-  });
-
-  it('says how long ago a day was, in the words the button uses', () => {
-    expect(relativeDay('2026-10-19', TODAY)).toBe('yesterday');
-    expect(relativeDay('2026-10-13', TODAY)).toBe('a week ago');
-    expect(relativeDay('2026-10-15', TODAY)).toBe('5 days ago');
   });
 });
 
@@ -171,14 +164,14 @@ describe('CompareMenuComponent', () => {
     fixture.componentInstance.since = '2026-10-15';
     fixture.detectChanges();
 
-    expect(ngMocks.formatText(button(fixture))).toBe('Compare with · 15 Oct · 5 days ago');
+    expect(ngMocks.formatText(button(fixture))).toBe('Change since 15 Oct');
     expect(button(fixture).nativeElement.classList).toContain('compare-btn--on');
   });
 
   it('names the preseason and nothing more', () => {
     const { fixture } = render(true, null);
 
-    expect(ngMocks.formatText(button(fixture))).toBe('Compare with · Preseason');
+    expect(ngMocks.formatText(button(fixture))).toBe('Change since preseason');
   });
 
   it('keeps reading Projection Change while the comparison is off, whatever day it kept', () => {
@@ -221,15 +214,14 @@ describe('CompareMenuComponent', () => {
     expect(document.activeElement).toBe(button(fixture).nativeElement);
   });
 
-  it('finishes the sentence with the preseason or a day of the calendar, and nothing else', () => {
+  it('offers the preseason or a day of the calendar, with an "or" between, and no title', () => {
     const { fixture } = render(false, null);
 
     const menu = open(fixture);
 
-    expect(menu.querySelector('.menu-title')!.textContent.trim()).toBe(
-      "Compare today's projection with",
-    );
-    expect(menu.getAttribute('aria-label')).toBe("Compare today's projection with");
+    expect(menu.querySelector('.menu-title')).toBeNull();
+    expect(menu.getAttribute('aria-label')).toBe('Projection change since');
+    expect(menu.querySelector('.or')!.textContent.trim()).toBe('or');
     expect(preseason(menu).textContent.trim()).toBe('Preseason');
     expect(month(menu)).toBe('October 2026');
     expect([...menu.querySelectorAll('th')].map((th) => th.textContent.trim())).toEqual([

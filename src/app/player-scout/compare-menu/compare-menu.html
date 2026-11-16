@@ -10,7 +10,7 @@
     [class.compare-btn--on]="on()"
     [appPopover]="compareMenu"
     popoverAlign="start"
-    popoverLabel="Compare today's projection with"
+    popoverLabel="Projection change since"
     (click)="startOver()"
   >
     @if (short(); as face) {
@@ -18,7 +18,7 @@
     } @else if (!on()) {
       <span class="compare-value">Projection Change</span>
     } @else {
-      <span class="compare-lead">Compare with · </span>
+      <span class="compare-lead">Change since </span>
       <span class="compare-value">{{ value() }}</span>
     }
     <app-icon class="chevron" name="chevron-down" [size]="14" />
@@ -36,12 +36,12 @@
   }
 </span>
 
-<!-- The menu finishes the sentence in its title: the preseason, or a day pressed in the calendar.
-     The days are one tab stop, walked with the arrows; the month's two arrows turn it without
-     picking anything. -->
+<!-- The menu holds the two answers to "change since when": the preseason, or a day pressed in
+     the calendar, with an "or" between them. No title: the pill that opened it already says what
+     it is for. The days are one tab stop, walked with the arrows; the month's two arrows turn it
+     without picking anything. -->
 <ng-template #compareMenu>
   <div class="menu">
-    <p class="menu-title">Compare today's projection with</p>
     <button
       type="button"
       class="preseason"
@@ -52,6 +52,7 @@
       Preseason
     </button>
     @if (!noDayYet()) {
+      <p class="or" aria-hidden="true">or</p>
       <div class="month">
         <!-- At the first and last month the arrow stays in the tab order and only stops
              answering: a button disabled under the finger that pressed it drops focus out of the
