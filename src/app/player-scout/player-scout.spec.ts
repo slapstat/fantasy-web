@@ -23,6 +23,7 @@ import { ErrorStateComponent } from '../shared/error-state/error-state';
 import { YahooLeaguePicker } from '../shared/yahoo-league-picker';
 import { PlayerScoutComponent, SCOUT_PAGE_SIZE, surname } from './player-scout';
 import { ScoutTableComponent } from './scout-table/scout-table';
+import { SwapBarComponent } from './swap-bar/swap-bar';
 import { CompareMenuComponent } from './compare-menu/compare-menu';
 
 const LEAGUE: ChosenLeague = { platform: 'YAHOO', leagueId: '465.l.9', name: 'The Gordie Howes' };
@@ -766,6 +767,42 @@ describe('PlayerScoutComponent', () => {
     expect(page.drop()).toBeNull();
   });
 
+  it('holds the drop picked in a swap bar over the list, sorted by the gain over him', async () => {
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    // No drop, no bar.
+    expect(ngMocks.findAll(fixture, SwapBarComponent)).toHaveLength(0);
+    page.sortBy('name');
+    expect(page.sort().key).toBe('name');
+
+    ngMocks.click(ngMocks.findAll(fixture, '.pill--drop')[1]);
+    fixture.detectChanges();
+
+    // A pick sorts by what each pickup gains the lineup over him, whatever the order was.
+    expect(page.sort()).toEqual({ key: 'gain', descending: true });
+    const bar = ngMocks.find(fixture, SwapBarComponent);
+    expect(ngMocks.input(bar, 'name')).toBe('Mine 202');
+    expect(ngMocks.input(bar, 'loss')).toBe(page.dropCost(page.drop()!));
+    expect(ngMocks.input(bar, 'unit')).toBe('points');
+
+    // Change unfolds the whole roster under the room line, and brings it into view.
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    ngMocks.output(bar, 'pickAnother').emit();
+    fixture.detectChanges();
+    expect(page.rosterOpen()).toBe(true);
+    expect(page.rosterAll()).toBe(true);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(page.drop()?.player.playerId).toBe('202');
+
+    // The cross lets him go, the bar with him, and the list back to its ranked order.
+    ngMocks.output(bar, 'cleared').emit();
+    fixture.detectChanges();
+    expect(page.drop()).toBeNull();
+    expect(ngMocks.findAll(fixture, SwapBarComponent)).toHaveLength(0);
+    expect(page.sort().key).not.toBe('gain');
+  });
+
   it('holds a player as a streamer only once he is marked, prices his spot, and remembers the mark for the league', async () => {
     // The C on injured reserve out for the season: back for no game, he takes no spot back.
     const answer = team();
@@ -990,7 +1027,7 @@ describe('PlayerScoutComponent', () => {
     // Two pages, every available player priced whether on screen or not.
     expect(page.pageCount()).toBe(2);
     expect(page.gains()?.size).toBe(23);
-    page.sortBy('gain');
+    // The pick itself sorts by the gain.
     expect(page.sort()).toEqual({ key: 'gain', descending: true });
     const first = page.sorted()[0];
     expect(first.scout.owner).toBeNull();

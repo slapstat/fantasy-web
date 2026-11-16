@@ -205,7 +205,9 @@ select:focus-visible,
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   margin-top: var(--space-4);
-  overflow: hidden;
+  /* Clip, not hidden: hidden would make the list a scroll box of its own, and the swap bar's
+     sticky would then hold to a box that never scrolls rather than to the page. */
+  overflow: clip;
 }
 
 /* The comparison on the table's own top line: the menu button, and, with a comparison on, the

@@ -1,5 +1,13 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  ElementRef,
+  inject,
+  linkedSignal,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { environment } from '../../environments/environment';
 import { RosterSlots } from '../api/models/roster-slots';
@@ -59,6 +67,7 @@ import {
   rankScout,
   SCOUT_MOVERS_ORDER,
   SCOUT_ADJUSTED_ORDER,
+  SCOUT_GAIN_ORDER,
   SCOUT_RANKED_ORDER,
   ScoutRow,
   ScoutSort,
@@ -66,6 +75,7 @@ import {
   sortScout,
 } from './scout-ranking';
 import { ScoutTableComponent } from './scout-table/scout-table';
+import { SwapBarComponent } from './swap-bar/swap-bar';
 import {
   formatDay,
   localToday,
@@ -147,6 +157,7 @@ export interface LeagueTeamOption {
     NgTemplateOutlet,
     PositionChipsComponent,
     ScoutTableComponent,
+    SwapBarComponent,
     CompareMenuComponent,
     TeamLogoComponent,
     TooltipDirective,
@@ -862,10 +873,38 @@ export class PlayerScoutComponent {
     return entry && this.canDrop(entry) ? entry : null;
   });
 
-  /** Picks him as the drop, or lets him go again when he is the one picked. */
+  /**
+   * Picks him as the drop, or lets him go again when he is the one picked. A new pick sorts the
+   * list by what each pickup gains the lineup over him, since that is the question a drop asks.
+   */
   pickDrop(playerId: string): void {
-    this.dropPicked.update((picked) => (picked === playerId ? null : playerId));
+    const picking = this.dropPicked() !== playerId;
+    this.dropPicked.set(picking ? playerId : null);
+    if (picking) {
+      this.sortPicked.set(SCOUT_GAIN_ORDER);
+    }
   }
+
+  /** The swap bar's cross: nobody is the drop, and the list goes back to its own order. */
+  clearDrop(): void {
+    this.dropPicked.set(null);
+  }
+
+  /** The room box, for the swap bar's Change to bring back into view. */
+  private readonly roomBox = viewChild<ElementRef<HTMLElement>>('roomBox');
+
+  /** The swap bar's Change: the whole roster unfolded under the room line, and scrolled to. */
+  changeDrop(): void {
+    this.rosterOpen.set(true);
+    this.rosterAll.set(true);
+    this.roomBox()?.nativeElement.scrollIntoView({ block: 'start' });
+  }
+
+  /** What the drop costs the lineup, for the swap bar; null when his place could not be weighed. */
+  readonly dropLoss = computed<string | null>(() => {
+    const drop = this.drop();
+    return drop?.value && drop.weighed ? this.dropCost(drop) : null;
+  });
 
   /** The chips on the room line: the four cheapest candidates, and the drop picked if he is another. */
   readonly dropChips = computed<readonly RosterEntry[]>(() => {
