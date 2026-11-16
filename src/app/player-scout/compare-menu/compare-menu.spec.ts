@@ -175,10 +175,10 @@ describe('CompareMenuComponent', () => {
     expect(button(fixture).nativeElement.classList).toContain('compare-btn--on');
   });
 
-  it('names the preseason as before game 1', () => {
+  it('names the preseason and nothing more', () => {
     const { fixture } = render(true, null);
 
-    expect(ngMocks.formatText(button(fixture))).toBe('Compare with · Preseason · before game 1');
+    expect(ngMocks.formatText(button(fixture))).toBe('Compare with · Preseason');
   });
 
   it('keeps reading Projection Change while the comparison is off, whatever day it kept', () => {
@@ -230,10 +230,7 @@ describe('CompareMenuComponent', () => {
       "Compare today's projection with",
     );
     expect(menu.getAttribute('aria-label')).toBe("Compare today's projection with");
-    expect(preseason(menu).querySelector('.preseason-label')!.textContent.trim()).toBe('Preseason');
-    expect(preseason(menu).querySelector('.preseason-note')!.textContent.trim()).toBe(
-      'before game 1',
-    );
+    expect(preseason(menu).textContent.trim()).toBe('Preseason');
     expect(month(menu)).toBe('October 2026');
     expect([...menu.querySelectorAll('th')].map((th) => th.textContent.trim())).toEqual([
       'Mo',
@@ -477,7 +474,6 @@ describe('CompareMenuComponent', () => {
     expect(preseason(menu)).not.toBeNull();
     expect(menu.querySelector('.days')).toBeNull();
     expect(menu.querySelector('.month')).toBeNull();
-    expect(menu.querySelector('.divider')).toBeNull();
   });
 
   it('offers the preseason alone on the first day kept, when yesterday is not one yet', () => {

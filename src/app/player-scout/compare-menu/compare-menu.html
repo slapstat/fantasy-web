@@ -49,11 +49,9 @@
       [attr.data-popover-initial-focus]="preseasonPicked() ? '' : null"
       (click)="pick(null, menu)"
     >
-      <span class="preseason-label">Preseason</span>
-      <span class="preseason-note">before game 1</span>
+      Preseason
     </button>
     @if (!noDayYet()) {
-      <div class="divider" role="presentation"></div>
       <div class="month">
         <!-- At the first and last month the arrow stays in the tab order and only stops
              answering: a button disabled under the finger that pressed it drops focus out of the

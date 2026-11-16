@@ -300,7 +300,7 @@ export class CompareMenuComponent {
   readonly value = computed(() => {
     const since = this.since();
     return since === null
-      ? 'Preseason · before game 1'
+      ? 'Preseason'
       : `${formatDay(since)} · ${relativeDay(since, this.today())}`;
   });
 
