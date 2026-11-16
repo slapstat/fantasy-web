@@ -433,6 +433,12 @@
             (cleared)="clearCompare()"
           />
           @if (compare()) {
+            <!-- What every heading sorts by: the figure, or its change since the day. -->
+            <app-lens-switch
+              [lens]="lens()"
+              [sinceLabel]="sinceLabel()"
+              (picked)="pickLens($event)"
+            />
             <div class="movers" role="group" aria-label="Which way the projection moved">
               <button
                 type="button"
@@ -507,6 +513,7 @@
             [scoringType]="scoringType()"
             [categories]="categories()"
             [compare]="compare()"
+            [lens]="lens()"
             [sinceLabel]="sinceLabel()"
             [showOwner]="pool() === 'all' || pool() === 'taken' || showMine()"
             [gains]="gains()"

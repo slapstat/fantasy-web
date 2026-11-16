@@ -22,6 +22,7 @@ import { YahooService } from '../services/yahoo.service';
 import { ErrorStateComponent } from '../shared/error-state/error-state';
 import { YahooLeaguePicker } from '../shared/yahoo-league-picker';
 import { PlayerScoutComponent, SCOUT_PAGE_SIZE, surname } from './player-scout';
+import { LensSwitchComponent } from './lens-switch/lens-switch';
 import { ScoutTableComponent } from './scout-table/scout-table';
 import { SwapBarComponent } from './swap-bar/swap-bar';
 import { CompareMenuComponent } from './compare-menu/compare-menu';
@@ -454,6 +455,35 @@ describe('PlayerScoutComponent', () => {
     page.clearCompare();
     expect(page.sort()).toEqual({ key: 'games', descending: true });
     page.pickSince(null);
+    expect(page.sort()).toEqual({ key: 'delta', descending: true });
+  });
+
+  it('opens the comparison on the change lens, and the switch moves the order to the same column read the other way', async () => {
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    expect(page.lens()).toBe('value');
+
+    page.pickSince('2026-10-07');
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(page.lens()).toBe('change');
+    expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'lens')).toBe('change');
+    const lensSwitch = ngMocks.find(fixture, LensSwitchComponent);
+    expect(ngMocks.input(lensSwitch, 'lens')).toBe('change');
+
+    page.sortBy('change:goals');
+    ngMocks.output(lensSwitch, 'picked').emit('value');
+    expect(page.lens()).toBe('value');
+    expect(page.sort()).toEqual({ key: 'goals', descending: true });
+    page.pickLens('change');
+    expect(page.sort()).toEqual({ key: 'change:goals', descending: true });
+
+    // Off, the headings sort by the figures; on again opens on the changes once more.
+    page.pickLens('value');
+    page.clearCompare();
+    expect(page.lens()).toBe('value');
+    page.pickSince(null);
+    expect(page.lens()).toBe('change');
     expect(page.sort()).toEqual({ key: 'delta', descending: true });
   });
 

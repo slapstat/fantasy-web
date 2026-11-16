@@ -1,4 +1,3 @@
-import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DEFAULT_DECIMAL_SETTINGS } from '../../draft-projection/projection-settings-section/model';
 import { ScoringType } from '../../models/projection.model';
@@ -25,6 +24,7 @@ import {
   ChangeKey,
   changeSortKey,
   SCOUT_RANKED_ORDER,
+  ScoutLens,
   ScoutRow,
   ScoutSort,
   ScoutSortKey,
@@ -59,13 +59,7 @@ export const TOP_GAINS = 3;
  */
 @Component({
   selector: 'app-scout-table',
-  imports: [
-    IconComponent,
-    NgTemplateOutlet,
-    PositionChipsComponent,
-    TeamLogoComponent,
-    TooltipDirective,
-  ],
+  imports: [IconComponent, PositionChipsComponent, TeamLogoComponent, TooltipDirective],
   templateUrl: './scout-table.html',
   styleUrls: [
     '../../streamer-planner/free-agents-table/free-agents-table.css',
@@ -80,6 +74,8 @@ export class ScoutTableComponent {
   readonly categories = input.required<readonly ScoringStatKey[]>();
   /** Whether each figure wears its change since the chosen day. */
   readonly compare = input<boolean>(false);
+  /** What the headings sort by with a comparison on: the figures, or their changes. */
+  readonly lens = input<ScoutLens>('value');
 
   /** Whether the table has the lineup column: the pickups priced for the user's lineup. */
   readonly gaining = computed(() => this.gains() !== null);
@@ -196,22 +192,18 @@ export class ScoutTableComponent {
       : 'Projected Z-Score for the rest of the season. Zero is the last player a league this size would roster.',
   );
 
+  /** Whether the headings sort by each figure's change: the page's switch, with a comparison on. */
+  readonly changeLens = computed(() => this.compare() && this.lens() === 'change');
+
   /**
-   * Which way a column is sorted, for its heading: by the figure, or, with a comparison on, by the
-   * figure's change, which is the same column read the other way.
+   * The key a figure's heading sorts under: the figure's own, or, through the change lens, its
+   * change's: the score's is `delta`, the rank's `rise`, every other's `change:<figure>`. The rank
+   * is no heading of its own on today's projection, which is the score's order; null there.
    */
-  ariaSort(key: ScoutSortKey, change?: ScoutSortKey): 'ascending' | 'descending' | null {
-    const sort = this.sort();
-    if (sort.key !== key && sort.key !== change) {
-      return null;
+  keyOf(figure: ChangeKey | 'score' | 'rank'): ScoutSortKey | null {
+    if (!this.changeLens()) {
+      return figure === 'rank' ? null : figure;
     }
-    return sort.descending ? 'descending' : 'ascending';
-  }
-
-  // --- The change's own heading -----------------------------------------------------------------
-
-  /** The key a figure's change sorts under: the score's is `delta`, every other's `change:<figure>`. */
-  changeKey(figure: ChangeKey | 'score' | 'rank'): ScoutSortKey {
     switch (figure) {
       case 'score':
         return 'delta';
@@ -222,21 +214,32 @@ export class ScoutTableComponent {
     }
   }
 
-  /** The change control's face: the way the list is sorted when it is by this change, else both ways. */
-  changeIcon(key: ScoutSortKey): 'arrow-down' | 'arrow-up' | 'arrow-up-down' {
+  /** Which way a column is sorted, for its heading; null for a column the list is not sorted by. */
+  ariaSort(key: ScoutSortKey | null): 'ascending' | 'descending' | null {
     const sort = this.sort();
-    if (sort.key !== key) {
-      return 'arrow-up-down';
+    if (key === null || sort.key !== key) {
+      return null;
     }
-    return sort.descending ? 'arrow-down' : 'arrow-up';
+    return sort.descending ? 'descending' : 'ascending';
   }
 
-  /**
-   * What a change's sort control stands for, said in full since the control is an icon: "Sort by
-   * the change in goals vs 7 Oct". The rank's is the places moved.
-   */
+  /** The arrow beside the heading the list is sorted by, the way it runs; none on any other. */
+  arrow(key: ScoutSortKey | null): 'arrow-down' | 'arrow-up' | null {
+    const sorted = this.ariaSort(key);
+    if (sorted === null) {
+      return null;
+    }
+    return sorted === 'descending' ? 'arrow-down' : 'arrow-up';
+  }
+
+  /** A heading's tooltip through the change lens: "Sort by the change in goals vs 7 Oct". */
   changeTip(what: string): string {
     return `Sort by the change in ${what} ${this.sinceLabel()}`;
+  }
+
+  /** The rank's heading through the change lens: the places gained since the day. */
+  rankChangeTip(): string {
+    return `Sort by places gained ${this.sinceLabel()}`;
   }
 
   private scoreDigits(): number {

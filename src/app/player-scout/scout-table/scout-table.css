@@ -1,7 +1,5 @@
-/* Every heading is built as its cell is: the figure's name on the first line, and, with a
-   comparison on, the sort control for its change on the second, where the cell has its change.
-   The headings sit on their first line rather than their last, so the names stay level whether
-   or not a second line hangs under them. */
+/* The headings sit on their first line rather than their last, so the names stay level whether
+   or not a second line (a gain column's "vs Silovs") hangs under one. */
 .scout-table thead th {
   vertical-align: top;
 }
@@ -16,31 +14,8 @@
   padding-right: var(--space-3);
 }
 
-/* The change's sort control: a second line under the name, quiet until it is the order, set to
-   the right like the change it sorts. An icon alone under the narrow headings, with its words in
-   the tooltip; the score's wears the word, as the one that teaches what the icons are. */
-.scout-table .sort--change {
-  color: var(--color-text-subtle);
-  display: flex;
-  font-size: var(--text-xs);
-  font-weight: normal;
-  justify-content: flex-end;
-  line-height: 1.3;
-  margin-top: 1px;
-  width: 100%;
-}
-
-.scout-table .sort--change:hover,
-.scout-table .sort--change.sort--on {
-  color: var(--color-primary);
-}
-
-.scout-table .sort--change.sort--on {
-  font-weight: var(--weight-semibold);
-}
-
-/* The rank's heading is a label, not a button; it keeps the heading's line so the control under
-   it sits level with the others. */
+/* On today's projection the rank's heading is a label, not a button: the rank is the score's
+   order. It keeps a heading's line so it sits level with the others. */
 .scout-table .rank-col .heading {
   display: inline-block;
   line-height: 1.25;
@@ -93,6 +68,28 @@
 /* A note under the figure rather than a change of it: "was L4 · No PP". */
 .delta--note {
   font-weight: normal;
+}
+
+/* Through the change lens, the page's Sort by switch on Change, the change is the figure to read:
+   it takes the figure's size, and today's figure steps down to the small grey line above it. The
+   table then shows by its ink which line the order runs on, where before a list sorted by the
+   change looked like one sorted by the figure. A position rank under the adjusted figure is a
+   note, not a change, and stays small. */
+.scout-table--lens-change :is(.figure-now, .score) {
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+  font-weight: normal;
+  line-height: 1.3;
+}
+
+.scout-table--lens-change .delta:not(.delta--note) {
+  font-size: inherit;
+  line-height: 1.35;
+  min-height: 1.35em;
+}
+
+.scout-table--lens-change td.score-col .delta {
+  font-weight: var(--weight-bold);
 }
 
 /* The rank wears the places gained or lost underneath, like any other figure, so the two columns

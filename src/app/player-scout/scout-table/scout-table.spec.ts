@@ -1,4 +1,3 @@
-import { NgTemplateOutlet } from '@angular/common';
 import { MockBuilder, MockRender, ngMocks } from 'ng-mocks';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Projection } from '../../models/projection.model';
@@ -106,7 +105,7 @@ function press(fixture: ReturnType<typeof MockRender<ScoutTableComponent>>, labe
 }
 
 describe('ScoutTableComponent', () => {
-  beforeEach(() => MockBuilder(ScoutTableComponent).keep(NgTemplateOutlet));
+  beforeEach(() => MockBuilder(ScoutTableComponent));
 
   function render(
     rows: ScoutRow[],
@@ -136,7 +135,8 @@ describe('ScoutTableComponent', () => {
     const fixture = render([risen()]);
 
     expect(ngMocks.findAll(fixture, '.delta')).toHaveLength(0);
-    expect(ngMocks.findAll(fixture, '.sort--change')).toHaveLength(0);
+    expect(ngMocks.findAll(fixture, 'th.rank-col button')).toHaveLength(0);
+    expect(ngMocks.findAll(fixture, '.scout-table--lens-change')).toHaveLength(0);
     expect(ngMocks.findAll(fixture, '.scout-tag')).toHaveLength(0);
     expect(ngMocks.formatText(ngMocks.find(fixture, 'td.rank-col'))).toBe('1');
     expect(ngMocks.formatText(ngMocks.find(fixture, 'td.score-col'))).toBe('85.0');
@@ -197,9 +197,9 @@ describe('ScoutTableComponent', () => {
     expect(ngMocks.formatText(ngMocks.find(score, '.delta'))).toBe('+32.5');
     // One heading row: nothing above it, and the day it compares with is in the controls' words.
     expect(ngMocks.findAll(fixture, 'thead tr')).toHaveLength(1);
-    expect(
-      ngMocks.find(fixture, 'th.score-col .sort--change').nativeElement.getAttribute('aria-label'),
-    ).toBe('Sort by the change in Points vs 7 Oct');
+    expect(fixture.point.componentInstance.changeTip('Points')).toBe(
+      'Sort by the change in Points vs 7 Oct',
+    );
   });
 
   it("writes each figure with its change underneath, in the stat's own precision and sense", () => {
@@ -339,48 +339,80 @@ describe('ScoutTableComponent', () => {
     expect(headings).toEqual(['G', 'A']);
   });
 
-  it("asks the page to sort by a heading pressed, and by a figure's change from the control under it, only with a comparison on", () => {
+  it('with a comparison on the figures, sorts each heading by its figure, the rank no heading', () => {
     const sortBy = vi.fn();
     const fixture = MockRender(ScoutTableComponent, {
       rows: [row(1, 'Brandon Montour', 1, { thenRank: 3, thenToi: 1050 })],
       scoringType: 'points',
       categories: ['goals', 'assists'],
       compare: true,
+      lens: 'value',
       sinceLabel: 'vs 7 Oct',
       sortBy,
     });
-    press(fixture, 'change');
+    press(fixture, 'Points');
     press(fixture, 'GP');
-    ngMocks.find(fixture, 'th.stat-col button.sort').nativeElement.click();
-    ngMocks.find(fixture, 'th.rank-col .sort--change').nativeElement.click();
-    ngMocks.find(fixture, 'th.toi-col .sort--change').nativeElement.click();
-    const goals = ngMocks.find(fixture, 'th.stat-col .sort--change');
-    goals.nativeElement.click();
+    press(fixture, 'TOI');
+    press(fixture, 'G');
 
-    expect(sortBy.mock.calls).toEqual([
-      ['delta'],
-      ['games'],
-      ['goals'],
-      ['rise'],
-      ['change:toi'],
-      ['change:goals'],
-    ]);
-    // The control under a narrow heading is an icon; its words are its label and tooltip.
-    expect(goals.nativeElement.getAttribute('aria-label')).toBe(
-      'Sort by the change in Goals vs 7 Oct',
-    );
-    expect(ngMocks.formatText(goals)).toBe('');
-    expect(ngMocks.findAll(render([row(1, 'Brandon Montour', 1)]), '.sort--change')).toHaveLength(
-      0,
-    );
+    expect(sortBy.mock.calls).toEqual([['score'], ['games'], ['toi'], ['goals']]);
+    expect(ngMocks.findAll(fixture, 'th.rank-col button')).toHaveLength(0);
+    // Today's figure is the line to read: the table draws nothing the change lens draws.
+    expect(ngMocks.findAll(fixture, '.scout-table--lens-change')).toHaveLength(0);
   });
 
-  it("marks a column sorted by its change as sorted, and the control with the order's arrow", () => {
+  it("through the change lens, sorts each heading, the rank's too, by the figure's change, one control a heading", () => {
+    const sortBy = vi.fn();
     const fixture = MockRender(ScoutTableComponent, {
       rows: [row(1, 'Brandon Montour', 1, { thenRank: 3, thenToi: 1050 })],
       scoringType: 'points',
       categories: ['goals', 'assists'],
       compare: true,
+      lens: 'change',
+      sinceLabel: 'vs 7 Oct',
+      sortBy,
+    });
+    press(fixture, '#');
+    press(fixture, 'Points');
+    press(fixture, 'GP');
+    press(fixture, 'TOI');
+    press(fixture, 'G');
+
+    expect(sortBy.mock.calls).toEqual([
+      ['rise'],
+      ['delta'],
+      ['change:games'],
+      ['change:toi'],
+      ['change:goals'],
+    ]);
+    for (const th of ngMocks.findAll(fixture, 'thead th.num')) {
+      expect(ngMocks.findAll(th, 'button')).toHaveLength(1);
+    }
+    expect(ngMocks.findAll(fixture, '.scout-table--lens-change')).toHaveLength(1);
+  });
+
+  it('without a comparison, a change lens left on sorts by the figures', () => {
+    const sortBy = vi.fn();
+    const fixture = MockRender(ScoutTableComponent, {
+      rows: [row(1, 'Brandon Montour', 1)],
+      scoringType: 'points',
+      categories: ['goals', 'assists'],
+      lens: 'change',
+      sortBy,
+    });
+    press(fixture, 'G');
+
+    expect(sortBy.mock.calls).toEqual([['goals']]);
+    expect(ngMocks.findAll(fixture, '.scout-table--lens-change')).toHaveLength(0);
+  });
+
+  it('marks a column sorted by its change as sorted, the arrow beside its name and on no other', () => {
+    const fixture = MockRender(ScoutTableComponent, {
+      rows: [row(1, 'Brandon Montour', 1, { thenRank: 3, thenToi: 1050 })],
+      scoringType: 'points',
+      categories: ['goals', 'assists'],
+      compare: true,
+      lens: 'change',
       sort: { key: 'change:goals', descending: true },
     });
 
@@ -388,11 +420,9 @@ describe('ScoutTableComponent', () => {
     expect(sorted).toHaveLength(1);
     expect(ngMocks.formatText(sorted[0])).toBe('G');
     expect(sorted[0].nativeElement.getAttribute('aria-sort')).toBe('descending');
-    const control = ngMocks.find(sorted[0], '.sort--change');
-    expect(control.nativeElement.classList).toContain('sort--on');
-    expect(ngMocks.input(ngMocks.find(control, 'app-icon'), 'name')).toBe('arrow-down');
-    const rest = ngMocks.find(fixture, 'th.toi-col .sort--change');
-    expect(ngMocks.input(ngMocks.find(rest, 'app-icon'), 'name')).toBe('arrow-up-down');
+    const icons = ngMocks.findAll(fixture, 'thead app-icon');
+    expect(icons).toHaveLength(1);
+    expect(ngMocks.input(icons[0], 'name')).toBe('arrow-down');
   });
 
   it('marks the column the list is sorted by, and which way', () => {
