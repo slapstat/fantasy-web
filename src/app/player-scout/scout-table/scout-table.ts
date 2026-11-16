@@ -82,7 +82,8 @@ export class ScoutTableComponent {
 
   /**
    * Whether the gains are set against a chosen drop. Without one the lineup column is what each
-   * pickup adds as if a spot were free, and the projection-less-the-drop column has nothing to be.
+   * pickup adds in an open roster spot, and the note of his projection less the drop's has
+   * nothing to be.
    */
   readonly against = computed(() => this.dropName() !== '');
 
@@ -370,7 +371,7 @@ export class ScoutTableComponent {
     return this.streaming() ? `${tip}, an open lineup spot at what a streamer would score` : tip;
   }
 
-  /** What the projection column stands for, in its heading's tooltip. */
+  /** What the note under a lineup figure stands for, in its tooltip. */
   scoreGainTip(): string {
     const drop = this.dropScore();
     const what = this.scoringType() === 'points' ? 'projected points' : 'projected Z-Score';

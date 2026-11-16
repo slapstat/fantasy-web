@@ -441,23 +441,22 @@ describe('ScoutTableComponent', () => {
 
   it('has no lineup column without gains', () => {
     const none = render([row(1, 'Brandon Montour', 1)]);
-    expect(ngMocks.findAll(none, '.gain-col, .score-gain-col, .player-gains')).toHaveLength(0);
-    expect(ngMocks.findAll(none, '.heading-sub')).toHaveLength(0);
+    expect(ngMocks.findAll(none, '.gain-col, .player-gains')).toHaveLength(0);
   });
 
-  it('heads the lineup column "if added" before a drop is chosen, and sets no projection against one', () => {
+  it('heads the lineup column on one line before a drop is chosen, and sets no projection against one', () => {
     const fixture = render([row(1, 'Brandon Montour', 1)], {
       gains: new Map<string, number | null>([['1', 41.2]]),
     });
 
     const heading = ngMocks.find(fixture, 'th.gain-col');
-    expect(ngMocks.formatText(heading)).toBe('Lineup if added');
+    expect(ngMocks.formatText(heading)).toBe('Lineup +/−');
     expect(heading.nativeElement.classList).toContain('stat-col--start');
-    expect(ngMocks.findAll(fixture, '.score-gain-col')).toHaveLength(0);
     expect(ngMocks.formatText(ngMocks.find(fixture, 'td.gain-col'))).toBe('+41.2');
+    expect(ngMocks.findAll(fixture, '.delta--note')).toHaveLength(0);
     expect(
       ngMocks.findAll(fixture, '.player-gain').map((line) => ngMocks.formatText(line)),
-    ).toEqual(['Lineup +41.2']);
+    ).toEqual(['Lineup +/− +41.2']);
   });
 
   it('heads a sortable gain column by the drop, each gain inked by its sign, the three biggest washed in green and a pickup it could not price as a question', () => {
@@ -486,8 +485,9 @@ describe('ScoutTableComponent', () => {
       sortBy,
     });
 
-    expect(ngMocks.formatText(ngMocks.find(fixture, 'th.gain-col'))).toBe('Lineup vs Hughes');
-    expect(ngMocks.formatText(ngMocks.find(fixture, 'th.gain-col .heading-sub'))).toBe('vs Hughes');
+    // One line: the drop is named by the swap bar above the list, not again under the heading.
+    expect(ngMocks.formatText(ngMocks.find(fixture, 'th.gain-col'))).toBe('Lineup +/−');
+    expect(ngMocks.findAll(fixture, 'thead th button + *')).toHaveLength(0);
     expect(ngMocks.findAll(fixture, 'td[tabindex]')).toHaveLength(0);
     const cells = ngMocks.findAll(fixture, 'td.gain-col');
     expect(cells.map((cell) => ngMocks.formatText(cell))).toEqual([
@@ -522,20 +522,20 @@ describe('ScoutTableComponent', () => {
     // The phone's line in the player cell says the same, for every pickup.
     const lines = ngMocks.findAll(fixture, '.player-gain');
     expect(lines.map((line) => ngMocks.formatText(line))).toEqual([
-      'Lineup +25.0',
-      'Lineup -4.3',
-      'Lineup ?',
-      'Lineup +80.0',
-      'Lineup +70.0',
-      'Lineup 0.0',
+      'Lineup +/− +25.0',
+      'Lineup +/− -4.3',
+      'Lineup +/− ?',
+      'Lineup +/− +80.0',
+      'Lineup +/− +70.0',
+      'Lineup +/− 0.0',
     ]);
     expect(lines[3].nativeElement.classList).toContain('player-gain--top');
 
-    press(fixture, 'Lineup');
+    press(fixture, 'Lineup +/−');
     expect(sortBy.mock.calls).toEqual([['gain']]);
   });
 
-  it("sets each pickup's projection against the drop's beside the lineup's gain, under the one heading that names him", () => {
+  it("notes each pickup's projection less the drop's under the lineup's gain, in no column of its own", () => {
     const fixture = render(
       [
         row(1, 'Brandon Montour', 1),
@@ -548,28 +548,20 @@ describe('ScoutTableComponent', () => {
       },
     );
 
-    // Its own heading, named by the drop under it, and it sorts under its own key: the order is
-    // the Points order, but a heading that answers nothing reads as broken.
-    const heading = ngMocks.find(fixture, 'th.score-gain-col');
-    expect(ngMocks.formatText(heading)).toBe('Points vs Hughes');
-    const sortBy = vi.fn();
-    fixture.point.componentInstance.sortBy.subscribe(sortBy);
-    ngMocks.find(heading, 'button.sort').nativeElement.click();
-    expect(sortBy).toHaveBeenCalledWith('scoreGain');
-    // Every row's 85 less his 60, and nothing for a player already taken.
-    const cells = ngMocks.findAll(fixture, 'td.score-gain-col');
-    expect(cells.map((cell) => ngMocks.formatText(cell))).toEqual(['+25.0', '']);
-    expect(cells[0].nativeElement.querySelector('.gain')?.className).toContain('gain--up');
-    expect(ngMocks.findAll(fixture, 'td.gain-col').map((cell) => ngMocks.formatText(cell))).toEqual(
-      ['+12.5', ''],
-    );
-    // The phone's line carries both, the projection's first.
+    expect(ngMocks.findAll(fixture, 'thead th.gain-col')).toHaveLength(1);
+    // Every row's 85 less his 60 as a grey note under the lineup's figure, and nothing for a
+    // player already taken.
+    const cells = ngMocks.findAll(fixture, 'td.gain-col');
+    expect(cells.map((cell) => ngMocks.formatText(cell))).toEqual(['+12.5+25.0 proj', '']);
+    expect(ngMocks.find(cells[0], '.figure-now').nativeElement.className).toContain('gain--up');
+    expect(ngMocks.formatText(ngMocks.find(cells[0], '.delta--note'))).toBe('+25.0 proj');
+    // The phone's line carries both, the lineup's first.
     expect(
       ngMocks.findAll(fixture, '.player-gain').map((line) => ngMocks.formatText(line)),
-    ).toEqual(['Points +25.0', 'Lineup +12.5']);
+    ).toEqual(['Lineup +/− +12.5', '+25.0 proj']);
   });
 
-  it("names the gain columns under their headings beside the comparison, in a category league's own unit, and writes no projection gain for a drop without a projection", () => {
+  it("keeps the heading one line beside the comparison, in a category league's own unit, and notes no projection gain for a drop without a projection", () => {
     const compared = render([risen()], {
       compare: true,
       gains: new Map<string, number | null>([['1', 1.5]]),
@@ -577,10 +569,8 @@ describe('ScoutTableComponent', () => {
       dropScore: 84.995,
     });
     expect(ngMocks.findAll(compared, 'thead tr')).toHaveLength(1);
-    expect(
-      ngMocks.findAll(compared, '.heading-sub').map((cell) => ngMocks.formatText(cell)),
-    ).toEqual(['vs Hughes', 'vs Hughes']);
-    expect(ngMocks.formatText(ngMocks.find(compared, 'td.score-gain-col'))).toBe('0.0');
+    expect(ngMocks.formatText(ngMocks.find(compared, 'th.gain-col'))).toBe('Lineup +/−');
+    expect(ngMocks.formatText(ngMocks.find(compared, 'td.gain-col .delta--note'))).toBe('0.0 proj');
 
     const categories = MockRender(ScoutTableComponent, {
       rows: [row(1, 'Brandon Montour', 1)],
@@ -590,13 +580,10 @@ describe('ScoutTableComponent', () => {
       dropName: 'Hughes',
       dropScore: null,
     });
-    expect(ngMocks.formatText(ngMocks.find(categories, 'th.score-gain-col'))).toBe(
-      'Z-Score vs Hughes',
-    );
-    expect(ngMocks.formatText(ngMocks.find(categories, 'td.score-gain-col'))).toBe('');
+    expect(ngMocks.findAll(categories, '.delta--note')).toHaveLength(0);
     expect(
       ngMocks.findAll(categories, '.player-gain').map((line) => ngMocks.formatText(line)),
-    ).toEqual(['Lineup +1.50']);
+    ).toEqual(['Lineup +/− +1.50']);
   });
 
   it('says an open lineup spot counts at a streamer, under the same heading, once streaming spots are held', () => {

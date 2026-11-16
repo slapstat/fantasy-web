@@ -340,21 +340,6 @@ describe('sorting the scout list', () => {
     expect(changeValue(goalie, 'toi')).toBeNull();
   });
 
-  it("sorts by his projection less the drop's as by his projection, under its own key", () => {
-    expect(ids(sortScout(rows, { key: 'scoreGain', descending: true }))).toEqual([
-      '1',
-      '2',
-      '3',
-      '4',
-    ]);
-    expect(ids(sortScout(rows, { key: 'scoreGain', descending: false }))).toEqual([
-      '4',
-      '3',
-      '2',
-      '1',
-    ]);
-  });
-
   it('names the figure a change key is the change of', () => {
     expect(changeSortKey('goals')).toEqual('change:goals');
     expect(changeOf('change:goals')).toEqual('goals');
@@ -374,7 +359,6 @@ describe('sorting the scout list', () => {
     expect(nextScoutSort(rise, 'rise')).toEqual({ key: 'rise', descending: false });
     expect(nextScoutSort(rise, 'delta')).toEqual({ key: 'delta', descending: true });
     expect(nextScoutSort(rise, 'gain')).toEqual({ key: 'gain', descending: true });
-    expect(nextScoutSort(rise, 'scoreGain')).toEqual({ key: 'scoreGain', descending: true });
     expect(nextScoutSort(rise, 'change:sog')).toEqual({ key: 'change:sog', descending: true });
     expect(nextScoutSort({ key: 'change:sog', descending: true }, 'change:sog')).toEqual({
       key: 'change:sog',
@@ -428,7 +412,7 @@ describe('sortInLens', () => {
   });
 
   it('leaves a column with no change as it is, either way', () => {
-    for (const key of ['name', 'gain', 'scoreGain', 'rostered'] as const) {
+    for (const key of ['name', 'gain', 'rostered'] as const) {
       const sort = { key, descending: false };
       expect(sortInLens(sort, 'change', false)).toBe(sort);
       expect(sortInLens(sort, 'value', false)).toBe(sort);

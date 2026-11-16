@@ -192,7 +192,7 @@ export type ChangeSortKey = `change:${ChangeKey}`;
  * position's replacement, in a position-adjusted ranking.
  */
 export type ScoutSortKey =
-  FreeAgentSortKey | 'delta' | 'rise' | 'gain' | 'scoreGain' | 'adjusted' | ChangeSortKey;
+  FreeAgentSortKey | 'delta' | 'rise' | 'gain' | 'adjusted' | ChangeSortKey;
 
 export interface ScoutSort {
   readonly key: ScoutSortKey;
@@ -246,7 +246,6 @@ export function sortInLens(sort: ScoutSort, lens: ScoutLens, adjusted: boolean):
       case 'name':
       case 'rostered':
       case 'gain':
-      case 'scoreGain':
       case 'delta':
       case 'rise':
         return sort;
@@ -270,7 +269,6 @@ function isScoutKey(key: ScoutSortKey): key is Exclude<ScoutSortKey, FreeAgentSo
     key === 'delta' ||
     key === 'rise' ||
     key === 'gain' ||
-    key === 'scoreGain' ||
     key === 'adjusted' ||
     changeOf(key) !== null
   );
@@ -336,11 +334,6 @@ function scoutSortValue(
       return row.rise;
     case 'gain':
       return gains.get(row.player.playerId) ?? null;
-    // His projection less the drop's: the drop's is the same for every row, so the column orders
-    // the list exactly as the score does. It sorts under its own key so that only its heading
-    // wears the arrow.
-    case 'scoreGain':
-      return row.score;
     case 'adjusted':
       return row.adjusted;
     default:
