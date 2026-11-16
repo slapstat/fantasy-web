@@ -66,18 +66,6 @@ export function formatDay(day: string | null | undefined): string {
   return DAY.format(new Date(year, month - 1, date));
 }
 
-/** How long ago a day was, as the button says it beside the date: "yesterday", "5 days ago". */
-export function relativeDay(day: string, today: string): string {
-  const days = daysBetween(day, today);
-  if (days === 1) {
-    return 'yesterday';
-  }
-  if (days === 7) {
-    return 'a week ago';
-  }
-  return `${days} days ago`;
-}
-
 /** The month an ISO date falls in, as `YYYY-MM`. */
 export function monthOf(day: string): string {
   return day.slice(0, 7);
@@ -158,10 +146,11 @@ export interface CalendarDay {
 }
 
 /**
- * The comparison, as one menu button: "Projection Change" in rest (Alexander, 2026-11-13), the
- * sentence "Compare with · 15 Oct · 5 days ago" with a comparison on. The menu under it finishes
- * the sentence with the two answers there are: the preseason, or a day of the reader's own, picked
- * in a calendar that is the menu itself. A cross on the button switches the comparison off.
+ * The comparison, as one menu button: "Projection Change" in rest (Alexander, 2026-11-13),
+ * "Change since 15 Oct" with a comparison on, so the pill keeps its noun in both states
+ * (Alexander, 2026-11-16). The menu under it holds the two answers there are: the preseason, or,
+ * after an "or", a day of the reader's own, picked in a calendar that is the menu itself. A cross
+ * on the button switches the comparison off.
  *
  * <p>A calendar rather than the lines it replaces (Alexander, 2026-11-15): the menu listed
  * Nothing, Yesterday, A week ago and the day last picked, with the reader's own day behind a
@@ -296,12 +285,14 @@ export class CompareMenuComponent {
     return stop?.iso ?? null;
   });
 
-  /** What the button says after "Compare with" while a comparison is on: the day and how long ago. */
+  /**
+   * What the button says after "Change since" while a comparison is on: the day, or the preseason.
+   * Not how long ago as well (Alexander, 2026-11-16): the date already says it, and the pill read
+   * as three things.
+   */
   readonly value = computed(() => {
     const since = this.since();
-    return since === null
-      ? 'Preseason'
-      : `${formatDay(since)} · ${relativeDay(since, this.today())}`;
+    return since === null ? 'preseason' : formatDay(since);
   });
 
   /**
