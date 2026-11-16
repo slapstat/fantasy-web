@@ -185,6 +185,16 @@ describe('priceDrop', () => {
     expect(pricing.gainFor(pickup(['C'], 90))).toBeCloseTo(10);
   });
 
+  it('with no drop, prices what a pickup adds as if a spot were free: the mirror of a cost', () => {
+    // The lineup keeps everyone. A centre scoring 90 starts over c2 (ten gained), one scoring 70
+    // starts nowhere, and a wing scoring 50 takes w1's seat: forty gained.
+    const pricing = priceDrop(null, team, SLOTS, nights, score);
+
+    expect(pricing.gainFor(pickup(['C'], 90))).toBeCloseTo(10);
+    expect(pricing.gainFor(pickup(['C'], 70))).toBeCloseTo(0);
+    expect(pricing.gainFor(pickup(['LW'], 50))).toBeCloseTo(40);
+  });
+
   it('charges a starter his starts: the pickup has to replace what the lineup loses', () => {
     // Without c2, c3 starts in his place: the lineup is 20 worse off. A centre scoring 70 then
     // starts over c3, so the swap nets 70 less 80.

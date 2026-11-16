@@ -140,7 +140,7 @@
             }
           </th>
         }
-        @if (gaining()) {
+        @if (gaining() && against()) {
           <!-- His projection less the drop's orders the list as his projection does; it sorts
                all the same, under its own key, since a heading that answers nothing reads as
                broken. -->
@@ -162,7 +162,16 @@
             </button>
             <span class="heading-sub">vs {{ dropName() }}</span>
           </th>
-          <th scope="col" class="num gain-col" [attr.aria-sort]="ariaSort('gain')">
+        }
+        @if (gaining()) {
+          <!-- The lineup's gain: against the drop once one is chosen, and before that what he adds
+               with a spot free, the mirror of a drop's cost on the room line. -->
+          <th
+            scope="col"
+            class="num gain-col"
+            [class.stat-col--start]="!against()"
+            [attr.aria-sort]="ariaSort('gain')"
+          >
             <button
               type="button"
               class="sort"
@@ -174,7 +183,13 @@
               }
               Lineup
             </button>
-            <span class="heading-sub">vs {{ dropName() }}</span>
+            <span class="heading-sub">
+              @if (against()) {
+                vs {{ dropName() }}
+              } @else {
+                if added
+              }
+            </span>
           </th>
         }
       </tr>
@@ -302,7 +317,7 @@
               }
             </td>
           }
-          @if (gaining()) {
+          @if (gaining() && against()) {
             <td class="num score-gain-col stat-col--start">
               @if (pickable(entry.row)) {
                 @if (scoreGain(entry.row); as more) {
@@ -310,7 +325,13 @@
                 }
               }
             </td>
-            <td class="num gain-col" [class.gain-col--top]="isTopGain(entry.row)">
+          }
+          @if (gaining()) {
+            <td
+              class="num gain-col"
+              [class.stat-col--start]="!against()"
+              [class.gain-col--top]="isTopGain(entry.row)"
+            >
               @if (pickable(entry.row)) {
                 @if (gain(entry.row); as gain) {
                   <span class="gain gain--{{ gain.dir }}">{{ gain.text }}</span>
