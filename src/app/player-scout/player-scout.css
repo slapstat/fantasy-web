@@ -725,7 +725,8 @@ select:focus-visible,
   margin-top: var(--space-3);
 }
 
-.list-count {
+.list-count,
+.list-total {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;

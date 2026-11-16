@@ -459,7 +459,7 @@
           <!-- How many players the toolbar's answer holds, at the right of the line under it, so
                every filter pressed shows its effect at once and the line is not a lone button. -->
           @if (!failure() && !loading() && !outOfSeason() && filtered().length > 0) {
-            <span class="list-count list-total" aria-live="polite">
+            <span class="list-total" aria-live="polite">
               {{ filtered().length }} {{ filtered().length === 1 ? 'player' : 'players' }}
             </span>
           }
