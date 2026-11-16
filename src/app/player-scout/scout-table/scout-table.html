@@ -3,8 +3,9 @@
     <thead>
       <!-- One heading row, and each heading built as its cell is: the figure's name over its
            change. With a comparison on, the lower line of a figure's heading sorts by the change
-           since the chosen day, so the list can answer which goals, shots or rank moved most; the
-           gain columns' lower line names the drop they are set against. A row of group names
+           since the chosen day, so the list can answer which goals, shots or rank moved most. The
+           gain columns' headings stay on one line: the swap bar above names the drop, and a second
+           line here grew the whole row the moment a drop was picked, so every heading jumped. A row of group names
            stood above this one for a while, and left a blank block over the frozen player column
            on every screen; what it said now sits in the headings it was about. -->
       <tr>
@@ -158,9 +159,9 @@
               @if (sort().key === 'scoreGain') {
                 <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
               }
-              {{ scoreHeading() }}
+              <span aria-hidden="true">±</span> {{ scoreHeading()
+              }}<span class="sr-only"> vs {{ dropName() }}</span>
             </button>
-            <span class="heading-sub">vs {{ dropName() }}</span>
           </th>
           <th scope="col" class="num gain-col" [attr.aria-sort]="ariaSort('gain')">
             <button
@@ -172,9 +173,10 @@
               @if (sort().key === 'gain') {
                 <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
               }
-              Lineup
+              <span aria-hidden="true">±</span> Lineup<span class="sr-only">
+                vs {{ dropName() }}</span
+              >
             </button>
-            <span class="heading-sub">vs {{ dropName() }}</span>
           </th>
         }
       </tr>
