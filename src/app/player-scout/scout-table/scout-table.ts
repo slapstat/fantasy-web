@@ -81,8 +81,14 @@ export class ScoutTableComponent {
   /** Whether each figure wears its change since the chosen day. */
   readonly compare = input<boolean>(false);
 
-  /** Whether the table has the gain columns: a drop chosen and the pickups priced against him. */
+  /** Whether the table has the lineup column: the pickups priced for the user's lineup. */
   readonly gaining = computed(() => this.gains() !== null);
+
+  /**
+   * Whether the gains are set against a chosen drop. Without one the lineup column is what each
+   * pickup adds as if a spot were free, and the projection-less-the-drop column has nothing to be.
+   */
+  readonly against = computed(() => this.dropName() !== '');
 
   /**
    * The three pickups the lineup gains the most by, among every one the page priced: the wash
@@ -107,9 +113,9 @@ export class ScoutTableComponent {
   /** Whether each row says who holds the player: only a list of more than the wire needs it. */
   readonly showOwner = input<boolean>(false);
   /**
-   * What the lineup gains by each available player against the chosen drop, by platform id (null
-   * for one the page could not price), or null for no gain column: nobody to drop, or no team
-   * of the user's.
+   * What the lineup gains by each available player, against the chosen drop or, with none, as if
+   * a spot were free, by platform id (null for one the page could not price), or null for no
+   * lineup column: no team of the user's.
    */
   readonly gains = input<ReadonlyMap<string, number | null> | null>(null);
   /** The chosen drop's surname, for the gain columns' heading. */
@@ -355,7 +361,9 @@ export class ScoutTableComponent {
 
   /** What the lineup column stands for, in its heading's tooltip. */
   gainTip(): string {
-    const tip = `What your lineup gains over the rest of the season by picking him up and dropping ${this.dropName()}: only the nights he would start count`;
+    const tip = this.against()
+      ? `What your lineup gains over the rest of the season by picking him up and dropping ${this.dropName()}: only the nights he would start count`
+      : "What he would add to your lineup over the rest of the season with a roster spot free for him: only the nights he would start count, the same measure as a drop's cost";
     return this.streaming() ? `${tip}, an open lineup spot at what a streamer would score` : tip;
   }
 

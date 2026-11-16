@@ -863,11 +863,12 @@ export class PlayerScoutComponent {
   });
 
   /**
-   * The drop every pickup is priced against: the one picked while he can still be. Nobody is
-   * chosen for the reader, so with none picked the list carries no gain column.
+   * The drop every pickup is priced against: the one picked while he can still be, and only on a
+   * full roster, where a pickup costs one. Nobody is chosen for the reader, so with none picked
+   * the gain column prices each pickup as if a spot were free.
    */
   readonly drop = computed<RosterEntry | null>(() => {
-    const picked = this.dropPicked();
+    const picked = this.fullRoster() ? this.dropPicked() : null;
     const entry =
       picked === null ? undefined : this.roster().find((row) => row.player.playerId === picked);
     return entry && this.canDrop(entry) ? entry : null;
@@ -882,12 +883,25 @@ export class PlayerScoutComponent {
     this.dropPicked.set(picking ? playerId : null);
     if (picking) {
       this.sortPicked.set(SCOUT_GAIN_ORDER);
+    } else {
+      this.leaveGainOrder();
     }
   }
 
   /** The swap bar's cross: nobody is the drop, and the list goes back to its own order. */
   clearDrop(): void {
     this.dropPicked.set(null);
+    this.leaveGainOrder();
+  }
+
+  /**
+   * With the drop let go the lineup column stays, priced as if a spot were free, but an order by
+   * the gain over him was the pick's doing, not the reader's: the list goes back to its own.
+   */
+  private leaveGainOrder(): void {
+    if (this.sortPicked().key === 'gain') {
+      this.sortPicked.set(this.positionAdjusted() ? SCOUT_ADJUSTED_ORDER : SCOUT_RANKED_ORDER);
+    }
   }
 
   /** The room box, for the swap bar's Change to bring back into view. */
@@ -927,6 +941,16 @@ export class PlayerScoutComponent {
   /** "143.1": what his going costs the lineup, as his chip and his row say it. */
   dropCost(entry: RosterEntry): string {
     return this.formatScore(entry.value?.marginal ?? null);
+  }
+
+  /**
+   * "-143.1": his cost written as a loss on his chip, signed as the list's lineup gains are, so
+   * the two read as one measure and neither is mistaken for a projection.
+   */
+  dropLossText(entry: RosterEntry): string {
+    const cost = entry.value?.marginal ?? null;
+    const text = this.formatScore(cost);
+    return cost !== null && Number(text) > 0 ? `-${text}` : text;
   }
 
   /** Whether the roster is unfolded under the room line: folded until asked for, and with each league. */
@@ -1025,7 +1049,10 @@ export class PlayerScoutComponent {
       }
     }
     if (this.gains() !== null) {
-      about.push('gain', 'scoreGain');
+      about.push('gain');
+      if (this.drop() !== null) {
+        about.push('scoreGain');
+      }
     }
     if (this.positionAdjusted()) {
       about.push('adjusted');
@@ -1158,18 +1185,19 @@ export class PlayerScoutComponent {
   // --- The gains ---------------------------------------------------------------------------------
 
   /**
-   * What the lineup gains by each available player in the list against the chosen drop, for a
-   * full roster: the one drop is priced once and every pickup against him,
-   * over the whole list rather than the page, so the column sorts. Null where there is no column:
-   * an open spot or an injured player to move costs nobody, so the room line is the whole answer;
-   * no team of the user's, or no drop that can be weighed.
+   * What the lineup gains by each available player in the list, over the whole list rather than
+   * the page, so the column sorts. With a drop chosen, against him: the one drop priced once and
+   * every pickup against him. With none, what each adds to the lineup as it stands, as if a spot
+   * were free for him: the same currency as a drop's cost on the room line, so a pickup's figure
+   * and a drop's can be read against each other rather than against his raw projection. Null with
+   * no team of the user's to price against.
    */
   readonly gains = computed<ReadonlyMap<string, number | null> | null>(() => {
     const team = this.team();
     const slots = this.slots();
     const schedule = this.schedule();
     const drop = this.drop();
-    if (!this.fullRoster() || !team || !slots || schedule.size === 0 || !drop) {
+    if (this.teamStatus() !== 'ready' || !team || !slots || schedule.size === 0) {
       return null;
     }
     const pickups = this.filtered().filter((row) => row.scout.owner === null);
@@ -1178,7 +1206,7 @@ export class PlayerScoutComponent {
     }
     const units = this.units();
     const pricing = priceDrop(
-      drop.player,
+      drop?.player ?? null,
       team,
       slots,
       schedule,
