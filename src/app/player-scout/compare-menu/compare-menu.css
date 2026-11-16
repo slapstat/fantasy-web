@@ -117,21 +117,32 @@
   text-transform: uppercase;
 }
 
+/* The preseason is a button and is drawn as one: an edge in rest, the line that says "a control
+   is here", since a bare word over a calendar read as the calendar's heading (Alexander,
+   2026-11-16). The days get that from their grid; this stands alone. */
 .preseason {
-  align-items: center;
-  background: none;
-  border: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-control);
   border-radius: var(--radius-sm);
-  color: var(--color-text);
+  color: var(--color-primary);
   cursor: pointer;
-  display: flex;
+  display: block;
   font: inherit;
   font-size: var(--text-sm);
-  justify-content: space-between;
+  font-weight: var(--weight-medium);
+  margin: 0.15rem 0 0.5rem;
   min-height: 2.25rem;
   padding: 0.3rem 0.5rem;
-  text-align: left;
+  text-align: center;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
   width: 100%;
+}
+
+/* Alone in the menu, before there is a day to pick, it needs no room under it. */
+.preseason:last-child {
+  margin-bottom: 0;
 }
 
 .preseason:hover,
@@ -147,11 +158,9 @@
   outline-offset: -2px;
 }
 
-.preseason-note {
-  color: var(--color-text-subtle);
-  font-size: var(--text-xs);
-  padding-left: var(--space-2);
-  white-space: nowrap;
+/* A ring inside the edge would sit on the edge; this one stands off it. */
+.preseason:focus-visible {
+  outline-offset: 1px;
 }
 
 /* The line picked: washed in the blue the page's other single choice (the drop under My team) is
@@ -159,8 +168,8 @@
    not the hover's grey neighbour. Navy ink on the wash reads 11.3:1. */
 .preseason[aria-pressed='true'] {
   background: var(--color-accent-surface);
-  box-shadow: inset 0 0 0 1.5px var(--color-accent);
-  color: var(--color-primary);
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 0.5px var(--color-accent);
   font-weight: var(--weight-semibold);
 }
 
@@ -177,17 +186,6 @@
 
 .day.day--picked:focus-visible {
   outline-offset: 1px;
-}
-
-/* On the blue wash the note takes the row's navy: a grey there is the one cold spot on it. */
-.preseason[aria-pressed='true'] .preseason-note {
-  color: var(--color-primary);
-  font-weight: 400;
-}
-
-.divider {
-  border-top: 1px solid var(--color-border);
-  margin: 0.4rem 0 0.3rem;
 }
 
 /* The month and the two arrows that turn it. */
