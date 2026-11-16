@@ -918,8 +918,9 @@ export class PlayerScoutComponent {
   }
 
   /**
-   * With the drop let go the lineup column stays, priced as if a spot were free, but an order by
-   * the gain over him was the pick's doing, not the reader's: the list goes back to its own.
+   * With the drop let go the lineup column goes, or with a spot open is priced in it, and an
+   * order by the gain over him was the pick's doing, not the reader's: the list goes back to its
+   * own.
    */
   private leaveGainOrder(): void {
     if (this.sortPicked().key === 'gain') {
@@ -1073,9 +1074,6 @@ export class PlayerScoutComponent {
     }
     if (this.gains() !== null) {
       about.push('gain');
-      if (this.drop() !== null) {
-        about.push('scoreGain');
-      }
     }
     if (this.positionAdjusted()) {
       about.push('adjusted');
@@ -1210,10 +1208,10 @@ export class PlayerScoutComponent {
   /**
    * What the lineup gains by each available player in the list, over the whole list rather than
    * the page, so the column sorts. With a drop chosen, against him: the one drop priced once and
-   * every pickup against him. With none, what each adds to the lineup as it stands, as if a spot
-   * were free for him: the same currency as a drop's cost on the room line, so a pickup's figure
-   * and a drop's can be read against each other rather than against his raw projection. Null with
-   * no team of the user's to price against.
+   * every pickup against him. With none and a roster spot open, what each adds to the lineup in
+   * it. With none and the roster full there is no answer to give: a pickup costs a drop, and a
+   * figure as if a spot were free would rank the list by a swap the reader cannot make, so the
+   * column waits for the drop. Null then, and with no team of the user's to price against.
    */
   readonly gains = computed<ReadonlyMap<string, number | null> | null>(() => {
     const team = this.team();
@@ -1221,6 +1219,9 @@ export class PlayerScoutComponent {
     const schedule = this.schedule();
     const drop = this.drop();
     if (this.teamStatus() !== 'ready' || !team || !slots || schedule.size === 0) {
+      return null;
+    }
+    if (drop === null && this.fullRoster()) {
       return null;
     }
     const pickups = this.filtered().filter((row) => row.scout.owner === null);

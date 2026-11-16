@@ -113,56 +113,23 @@
             </button>
           </th>
         }
-        @if (gaining() && against()) {
-          <!-- His projection less the drop's orders the list as his projection does; it sorts
-               all the same, under its own key, since a heading that answers nothing reads as
-               broken. -->
-          <th
-            scope="col"
-            class="num score-gain-col stat-col--start"
-            [attr.aria-sort]="ariaSort('scoreGain')"
-          >
-            <button
-              type="button"
-              class="sort"
-              [appTooltip]="scoreGainTip()"
-              (click)="sortBy.emit('scoreGain')"
-            >
-              @if (sort().key === 'scoreGain') {
-                <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
-              }
-              {{ scoreHeading() }}
-            </button>
-            <span class="heading-sub">vs {{ dropName() }}</span>
-          </th>
-        }
         @if (gaining()) {
-          <!-- The lineup's gain: against the drop once one is chosen, and before that what he adds
-               with a spot free, the mirror of a drop's cost on the room line. -->
-          <th
-            scope="col"
-            class="num gain-col"
-            [class.stat-col--start]="!against()"
-            [attr.aria-sort]="ariaSort('gain')"
-          >
+          <!-- The lineup's +/-: against the drop once one is chosen, and before that, with a roster
+               spot open, what he adds in it. One line like every other heading: whom it is set
+               against is said once, by the swap bar or the room line above the list. -->
+          <th scope="col" class="num gain-col stat-col--start" [attr.aria-sort]="ariaSort('gain')">
             <button
               type="button"
               class="sort"
+              aria-label="Lineup plus-minus"
               [appTooltip]="gainTip()"
               (click)="sortBy.emit('gain')"
             >
               @if (sort().key === 'gain') {
                 <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
               }
-              Lineup
+              Lineup +/&minus;
             </button>
-            <span class="heading-sub">
-              @if (against()) {
-                vs {{ dropName() }}
-              } @else {
-                if added
-              }
-            </span>
           </th>
         }
       </tr>
@@ -231,15 +198,8 @@
                      frozen player cell instead; the stylesheet shows one or the other. -->
                 @if (gaining() && pickable(entry.row)) {
                   <span class="player-gains">
-                    @if (scoreGain(entry.row); as more) {
-                      <span class="player-gain">
-                        <span class="player-gain-label">{{ scoreHeading() }}</span>
-                        &ngsp;
-                        <span class="gain gain--score gain--{{ more.dir }}">{{ more.text }}</span>
-                      </span>
-                    }
                     <span class="player-gain" [class.player-gain--top]="isTopGain(entry.row)">
-                      <span class="player-gain-label">Lineup</span>
+                      <span class="player-gain-label">Lineup +/&minus;</span>
                       &ngsp;
                       @if (gain(entry.row); as gain) {
                         <span class="gain gain--{{ gain.dir }}">{{ gain.text }}</span>
@@ -247,6 +207,9 @@
                         <span class="gain-unknown">?</span>
                       }
                     </span>
+                    @if (scoreGain(entry.row); as more) {
+                      <span class="player-gain player-gain--note">{{ more.text }} proj</span>
+                    }
                   </span>
                 }
               </span>
@@ -290,26 +253,20 @@
               }
             </td>
           }
-          @if (gaining() && against()) {
-            <td class="num score-gain-col stat-col--start">
-              @if (pickable(entry.row)) {
-                @if (scoreGain(entry.row); as more) {
-                  <span class="gain gain--score gain--{{ more.dir }}">{{ more.text }}</span>
-                }
-              }
-            </td>
-          }
           @if (gaining()) {
-            <td
-              class="num gain-col"
-              [class.stat-col--start]="!against()"
-              [class.gain-col--top]="isTopGain(entry.row)"
-            >
+            <!-- The lineup's figure, and under it, small and grey as a note under any figure, his
+                 projection less the drop's: the plain difference the lineup's room then cuts. -->
+            <td class="num gain-col stat-col--start" [class.gain-col--top]="isTopGain(entry.row)">
               @if (pickable(entry.row)) {
                 @if (gain(entry.row); as gain) {
-                  <span class="gain gain--{{ gain.dir }}">{{ gain.text }}</span>
+                  <span class="figure-now gain gain--{{ gain.dir }}">{{ gain.text }}</span>
                 } @else {
-                  <span class="gain-unknown">?</span>
+                  <span class="figure-now gain-unknown">?</span>
+                }
+                @if (scoreGain(entry.row); as more) {
+                  <span class="delta delta--note" [appTooltip]="scoreGainTip()"
+                    >{{ more.text }} proj</span
+                  >
                 }
               }
             </td>
