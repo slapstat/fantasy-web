@@ -1,0 +1,54 @@
+/* What the headings sort by: one segmented switch, one side always pressed, so it reads as a mode
+   and not as two more chips beside Risers and Fallers. The pressed side takes the primary fill
+   the sorted heading's ink is drawn in. */
+:host {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.lens-label {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.lens-options {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  padding: 2px;
+}
+
+.lens-option {
+  background: none;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  line-height: 1.2;
+  min-height: 1.75rem;
+  padding: 0.25rem 0.75rem;
+  transition:
+    background-color 0.15s ease-out,
+    color 0.15s ease-out;
+}
+
+.lens-option:hover:not(.lens-option--on) {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.lens-option:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.lens-option--on {
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+}

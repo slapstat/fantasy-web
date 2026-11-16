@@ -70,11 +70,14 @@ import {
   SCOUT_GAIN_ORDER,
   SCOUT_RANKED_ORDER,
   ScoutRow,
+  ScoutLens,
   ScoutSort,
   ScoutSortKey,
+  sortInLens,
   sortScout,
 } from './scout-ranking';
 import { ScoutTableComponent } from './scout-table/scout-table';
+import { LensSwitchComponent } from './lens-switch/lens-switch';
 import { SwapBarComponent } from './swap-bar/swap-bar';
 import {
   formatDay,
@@ -153,6 +156,7 @@ export interface LeagueTeamOption {
     ErrorStateComponent,
     IconComponent,
     LeagueFieldComponent,
+    LensSwitchComponent,
     LoadingIndicatorComponent,
     NgTemplateOutlet,
     PositionChipsComponent,
@@ -234,12 +238,14 @@ export class PlayerScoutComponent {
 
   /**
    * The comparison on, and the list in the order the comparison is for: the players the model
-   * makes the most more of since the day. Off again, the ranked order comes back of itself
-   * ({@link sort}), unless the reader has sorted by something else since.
+   * makes the most more of since the day, the headings sorting by each figure's change. Off
+   * again, the ranked order comes back of itself ({@link sort}), unless the reader has sorted by
+   * something else since.
    */
   private switchOn(): void {
     if (!this.compare()) {
       this.compare.set(true);
+      this.lensPicked.set('change');
       this.sortPicked.set(SCOUT_MOVERS_ORDER);
     }
   }
@@ -247,6 +253,23 @@ export class PlayerScoutComponent {
   /** Off: today's projection alone. The day is kept, so Off and back lands on the same one. */
   clearCompare(): void {
     this.compare.set(false);
+  }
+
+  private readonly lensPicked = signal<ScoutLens>('change');
+
+  /**
+   * What the headings sort by: each figure, or, with a comparison on and the reader not having
+   * asked for the figures, each figure's change since the day.
+   */
+  readonly lens = computed<ScoutLens>(() => (this.compare() ? this.lensPicked() : 'value'));
+
+  /** The headings to sort by the figures or their changes; the column read stays the column. */
+  pickLens(lens: ScoutLens): void {
+    if (lens === this.lens()) {
+      return;
+    }
+    this.lensPicked.set(lens);
+    this.sortPicked.set(sortInLens(this.sort(), lens, this.positionAdjusted()));
   }
 
   /**

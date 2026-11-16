@@ -1,0 +1,23 @@
+<span class="lens-label" aria-hidden="true">Sort by</span>
+<span class="lens-options">
+  <button
+    type="button"
+    class="lens-option"
+    [class.lens-option--on]="lens() === 'value'"
+    [attr.aria-pressed]="lens() === 'value'"
+    appTooltip="Sort each column by today's projection"
+    (click)="picked.emit('value')"
+  >
+    Projection
+  </button>
+  <button
+    type="button"
+    class="lens-option"
+    [class.lens-option--on]="lens() === 'change'"
+    [attr.aria-pressed]="lens() === 'change'"
+    [appTooltip]="'Sort each column by its change ' + sinceLabel()"
+    (click)="picked.emit('change')"
+  >
+    Change
+  </button>
+</span>

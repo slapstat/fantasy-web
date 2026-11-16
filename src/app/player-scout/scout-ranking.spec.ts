@@ -9,7 +9,9 @@ import {
   nextScoutSort,
   rankScout,
   SCOUT_MOVERS_ORDER,
+  SCOUT_ADJUSTED_ORDER,
   SCOUT_RANKED_ORDER,
+  sortInLens,
   sortScout,
   statOf,
   toiPerGame,
@@ -385,5 +387,51 @@ describe('sorting the scout list', () => {
     expect(nextScoutSort(rise, 'score')).toEqual({ key: 'score', descending: true });
     expect(nextScoutSort(rise, 'name')).toEqual({ key: 'name', descending: false });
     expect(nextScoutSort(rise, 'goals')).toEqual({ key: 'goals', descending: true });
+  });
+});
+
+describe('sortInLens', () => {
+  it('through the change lens, a figure sorts by its change, the way it ran', () => {
+    expect(sortInLens({ key: 'score', descending: true }, 'change', false)).toEqual({
+      key: 'delta',
+      descending: true,
+    });
+    expect(sortInLens({ key: 'adjusted', descending: true }, 'change', true)).toEqual({
+      key: 'delta',
+      descending: true,
+    });
+    expect(sortInLens({ key: 'goals', descending: false }, 'change', false)).toEqual({
+      key: 'change:goals',
+      descending: false,
+    });
+    expect(sortInLens({ key: 'toi', descending: true }, 'change', false)).toEqual({
+      key: 'change:toi',
+      descending: true,
+    });
+  });
+
+  it('back on the figures, a change sorts by its figure, and places gained by the ranked order', () => {
+    expect(sortInLens({ key: 'change:goals', descending: true }, 'value', false)).toEqual({
+      key: 'goals',
+      descending: true,
+    });
+    expect(sortInLens({ key: 'delta', descending: true }, 'value', false)).toEqual({
+      key: 'score',
+      descending: true,
+    });
+    expect(sortInLens({ key: 'delta', descending: true }, 'value', true)).toEqual({
+      key: 'adjusted',
+      descending: true,
+    });
+    expect(sortInLens({ key: 'rise', descending: false }, 'value', false)).toBe(SCOUT_RANKED_ORDER);
+    expect(sortInLens({ key: 'rise', descending: true }, 'value', true)).toBe(SCOUT_ADJUSTED_ORDER);
+  });
+
+  it('leaves a column with no change as it is, either way', () => {
+    for (const key of ['name', 'gain', 'scoreGain', 'rostered'] as const) {
+      const sort = { key, descending: false };
+      expect(sortInLens(sort, 'change', false)).toBe(sort);
+      expect(sortInLens(sort, 'value', false)).toBe(sort);
+    }
   });
 });

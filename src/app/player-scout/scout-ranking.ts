@@ -223,6 +223,47 @@ export function changeOf(key: ScoutSortKey): ChangeKey | null {
   return key.startsWith('change:') ? (key.slice('change:'.length) as ChangeKey) : null;
 }
 
+/**
+ * What a figure's heading sorts by: the figure itself, or, with a comparison on, its change since
+ * the chosen day. One switch over the table says which, so every heading is one control: two
+ * controls stacked in each heading, the change's a bare up-and-down arrow, read as "this column
+ * sorts" and left the figure's own order unmarked (Alexander, 2026-11-16).
+ */
+export type ScoutLens = 'value' | 'change';
+
+/**
+ * The same order read through the other lens: a figure's column becomes its change, and the
+ * change its figure, so switching keeps the reader on the column he was reading. A column with no
+ * change, the name or a gain, stays as it is.
+ */
+export function sortInLens(sort: ScoutSort, lens: ScoutLens, adjusted: boolean): ScoutSort {
+  const { key, descending } = sort;
+  if (lens === 'change') {
+    switch (key) {
+      case 'score':
+      case 'adjusted':
+        return { key: 'delta', descending };
+      case 'name':
+      case 'rostered':
+      case 'gain':
+      case 'scoreGain':
+      case 'delta':
+      case 'rise':
+        return sort;
+      default:
+        return changeOf(key) === null ? { key: changeSortKey(key as ChangeKey), descending } : sort;
+    }
+  }
+  if (key === 'delta') {
+    return { key: adjusted ? 'adjusted' : 'score', descending };
+  }
+  if (key === 'rise') {
+    return adjusted ? SCOUT_ADJUSTED_ORDER : SCOUT_RANKED_ORDER;
+  }
+  const figure = changeOf(key);
+  return figure === null ? sort : { key: figure, descending };
+}
+
 /** Whether the key is one of the scout's own, which the planner's sort knows nothing of. */
 function isScoutKey(key: ScoutSortKey): key is Exclude<ScoutSortKey, FreeAgentSortKey> {
   return (
