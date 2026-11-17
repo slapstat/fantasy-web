@@ -267,6 +267,11 @@ describe('sorting the scout list', () => {
     expect(ids(sortScout(rows, { key: 'delta', descending: false }))).toEqual(['4', '3', '2', '1']);
   });
 
+  it('sorts by the rank, first place first, and turns it round', () => {
+    expect(ids(sortScout(rows, { key: 'rank', descending: false }))).toEqual(['1', '2', '3', '4']);
+    expect(ids(sortScout(rows, { key: 'rank', descending: true }))).toEqual(['4', '3', '2', '1']);
+  });
+
   it('sorts by the rise, the furthest risen first, a player with no then-line last', () => {
     expect(rows.map((row) => row.rise)).toEqual([null, 1, -1, -3]);
     expect(ids(sortScout(rows, { key: 'rise', descending: true }))).toEqual(['2', '3', '4', '1']);
@@ -366,6 +371,13 @@ describe('sorting the scout list', () => {
     });
   });
 
+  it('opens the rank at first place, and turns it round on a second press', () => {
+    const rank = nextScoutSort({ key: 'goals', descending: true }, 'rank');
+    expect(rank).toEqual({ key: 'rank', descending: false });
+    expect(nextScoutSort(rank, 'rank')).toEqual({ key: 'rank', descending: true });
+    expect(nextScoutSort(rank, 'score')).toEqual({ key: 'score', descending: true });
+  });
+
   it('opens every other column best first, from the rise too', () => {
     const rise = { key: 'rise', descending: false } as const;
     expect(nextScoutSort(rise, 'score')).toEqual({ key: 'score', descending: true });
@@ -391,6 +403,17 @@ describe('sortInLens', () => {
     expect(sortInLens({ key: 'toi', descending: true }, 'change', false)).toEqual({
       key: 'change:toi',
       descending: true,
+    });
+  });
+
+  it('through the change lens, the rank sorts by places gained, best first still best first', () => {
+    expect(sortInLens({ key: 'rank', descending: false }, 'change', false)).toEqual({
+      key: 'rise',
+      descending: true,
+    });
+    expect(sortInLens({ key: 'rank', descending: true }, 'change', true)).toEqual({
+      key: 'rise',
+      descending: false,
     });
   });
 

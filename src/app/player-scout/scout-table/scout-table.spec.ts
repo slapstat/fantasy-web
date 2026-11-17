@@ -143,7 +143,6 @@ describe('ScoutTableComponent', () => {
     const fixture = render([risen()]);
 
     expect(ngMocks.findAll(fixture, '.delta')).toHaveLength(0);
-    expect(ngMocks.findAll(fixture, 'th.rank-col button')).toHaveLength(0);
     expect(ngMocks.findAll(fixture, '.scout-table--lens-change')).toHaveLength(0);
     expect(ngMocks.findAll(fixture, '.scout-tag')).toHaveLength(0);
     expect(ngMocks.formatText(ngMocks.find(fixture, 'td.rank-col'))).toBe('1');
@@ -369,7 +368,24 @@ describe('ScoutTableComponent', () => {
     expect(headings).toEqual(['G', 'A']);
   });
 
-  it('with a comparison on the figures, sorts each heading by its figure, the rank no heading', () => {
+  it('sorts by the rank from the # heading, and marks it while sorted', () => {
+    const sortBy = vi.fn();
+    const fixture = MockRender(ScoutTableComponent, {
+      rows: [risen()],
+      scoringType: 'points',
+      categories: ['goals', 'assists'],
+      sinceLabel: 'vs 7 Oct',
+      sort: { key: 'rank', descending: false },
+      sortBy,
+    });
+    press(fixture, '#');
+
+    expect(sortBy.mock.calls).toEqual([['rank']]);
+    const heading = ngMocks.find(fixture, 'th.rank-col');
+    expect(heading.attributes['aria-sort']).toBe('ascending');
+  });
+
+  it('with a comparison on the figures, sorts each heading by its figure, the rank by its rank', () => {
     const sortBy = vi.fn();
     const fixture = MockRender(ScoutTableComponent, {
       rows: [row(1, 'Brandon Montour', 1, { thenRank: 3, thenToi: 1050 })],
@@ -380,13 +396,13 @@ describe('ScoutTableComponent', () => {
       sinceLabel: 'vs 7 Oct',
       sortBy,
     });
+    press(fixture, '#');
     press(fixture, 'Points');
     press(fixture, 'GP');
     press(fixture, 'TOI');
     press(fixture, 'G');
 
-    expect(sortBy.mock.calls).toEqual([['score'], ['games'], ['toi'], ['goals']]);
-    expect(ngMocks.findAll(fixture, 'th.rank-col button')).toHaveLength(0);
+    expect(sortBy.mock.calls).toEqual([['rank'], ['score'], ['games'], ['toi'], ['goals']]);
     // Today's figure is the line to read: the table draws nothing the change lens draws.
     expect(ngMocks.findAll(fixture, '.scout-table--lens-change')).toHaveLength(0);
   });

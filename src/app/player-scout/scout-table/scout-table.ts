@@ -208,12 +208,11 @@ export class ScoutTableComponent {
 
   /**
    * The key a figure's heading sorts under: the figure's own, or, through the change lens, its
-   * change's: the score's is `delta`, the rank's `rise`, every other's `change:<figure>`. The rank
-   * is no heading of its own on today's projection, which is the score's order; null there.
+   * change's: the score's is `delta`, the rank's `rise`, every other's `change:<figure>`.
    */
-  keyOf(figure: ChangeKey | 'score' | 'rank'): ScoutSortKey | null {
+  keyOf(figure: ChangeKey | 'score' | 'rank'): ScoutSortKey {
     if (!this.changeLens()) {
-      return figure === 'rank' ? null : figure;
+      return figure;
     }
     switch (figure) {
       case 'score':
@@ -248,9 +247,9 @@ export class ScoutTableComponent {
     return `Sort by the change in ${what} ${this.sinceLabel()}`;
   }
 
-  /** The rank's heading through the change lens: the places gained since the day. */
-  rankChangeTip(): string {
-    return `Sort by places gained ${this.sinceLabel()}`;
+  /** The rank's heading: the rank itself, or through the change lens the places gained since the day. */
+  rankSortTip(): string {
+    return this.changeLens() ? `Sort by places gained ${this.sinceLabel()}` : this.rankTip();
   }
 
   private scoreDigits(): number {
