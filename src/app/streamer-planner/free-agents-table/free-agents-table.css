@@ -313,13 +313,30 @@ span.score {
   }
 }
 
-/* The categories, a column each: narrow, since a week's number is three or four characters, and
-   set off from the columns about the player by a rule down the first, and the goalies' from the
-   skaters' by another. */
-.free-agents-table .stat-col {
-  padding-inline: var(--space-2) 2px;
+/* Figures are set right, so the room between two columns is the left one's right padding and
+   the right one's left padding. With a quarter rem a side, a column of 56.4 stood 8px from the
+   25.8 beside it and the row read as one string of digits. The room goes on the left, where it
+   separates a figure from its neighbour; the right keeps the cell's own, which the marks below
+   widen. The rank is centred in its own medal-width column and keeps its padding. */
+.free-agents-table .num:not(.rank-col) {
+  padding-left: var(--space-3);
 }
 
+/* The last column ended 2px short of the table's edge, its figures flush against the card. */
+.free-agents-table:not(.free-agents-table--marked) :is(th, td):last-child {
+  padding-right: var(--space-3);
+}
+
+/* A phone cannot spare the full room across a dozen columns: every one it adds is width scrolled
+   off the screen. Half a rem still keeps the figures apart. */
+@container (max-width: 38rem) {
+  .free-agents-table .num:not(.rank-col) {
+    padding-left: var(--space-2);
+  }
+}
+
+/* The categories, a column each, set off from the columns about the player by a rule down the
+   first, and the goalies' from the skaters' by another. */
 .free-agents-table .stat-col--start {
   border-left: 1px solid var(--color-border);
   padding-left: var(--space-3);
