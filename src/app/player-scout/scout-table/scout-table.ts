@@ -6,6 +6,7 @@ import {
   RATE_STAT_KEYS,
   ScoringStatKey,
 } from '../../models/stat-key.model';
+import { tradeable } from '../trade-roster';
 import { IconComponent } from '../../shared/icon/icon';
 import { PositionChipsComponent } from '../../shared/position-chips/position-chips';
 import { TeamLogoComponent } from '../../shared/team-logo/team-logo';
@@ -129,6 +130,16 @@ export class ScoutTableComponent {
    * pickup's can be set against it; null when he has none.
    */
   readonly dropScore = input<number | null>(null);
+  /**
+   * Whether players other teams hold are priced too, as a one-for-one trade for the chosen
+   * drop: their figure is then in {@link gains} beside the pickups'.
+   */
+  readonly trading = input<boolean>(false);
+  /**
+   * The other side of each trade on the page: what the team holding him gains by giving him for
+   * the drop, by platform id (null where it could not be priced), or null with no trade on.
+   */
+  readonly theirGains = input<ReadonlyMap<string, number | null> | null>(null);
   /**
    * Whether the user holds streaming spots, so the lineup's gain counts an open lineup spot at
    * what a streamer would score in it that night rather than at nothing.
@@ -343,6 +354,31 @@ export class ScoutTableComponent {
     return row.scout.owner === null;
   }
 
+  /** Whether the row is a trade the lineup column prices: another team's player, a drop chosen. */
+  isTrade(row: ScoutRow): boolean {
+    return this.trading() && this.against() && tradeable(row);
+  }
+
+  /** Whether the lineup column has a figure for the row: a pickup, or a trade. */
+  priced(row: ScoutRow): boolean {
+    return this.pickable(row) || this.isTrade(row);
+  }
+
+  /**
+   * "+8.2" / "-12.3": what his team's lineup gains by the trade, signed as the user's gain is but
+   * left grey under it, since green there would read as good for the user. Null where his side
+   * could not be priced, or the page has not priced it.
+   */
+  theirGain(row: ScoutRow): Delta | null {
+    return this.gainFigure(this.theirGains()?.get(row.player.playerId) ?? null);
+  }
+
+  /** What the other side's figure stands for, in its tooltip. */
+  theirGainTip(row: ScoutRow): string {
+    const team = row.scout.owner?.teamName ?? 'His team';
+    return `What ${team}'s lineup gains over the rest of the season by trading him for ${this.dropName()}: only the nights each would start count`;
+  }
+
   /**
    * "+12.4" for an upgrade, "-3.1" for none, "0.0" for neither, each with the way it points so the
    * figure wears green or red like the changes beside it; null where the page could not price him.
@@ -374,8 +410,11 @@ export class ScoutTableComponent {
 
   /** What the lineup column stands for, in its heading's tooltip. */
   gainTip(): string {
+    const how = this.trading()
+      ? `picking him up, or trading for him, and giving ${this.dropName()}`
+      : `picking him up and dropping ${this.dropName()}`;
     const tip = this.against()
-      ? `What your lineup gains over the rest of the season by picking him up and dropping ${this.dropName()}: only the nights he would start count`
+      ? `What your lineup gains over the rest of the season by ${how}: only the nights he would start count`
       : "What he would add to your lineup over the rest of the season with a roster spot free for him: only the nights he would start count, the same measure as a drop's cost";
     return this.streaming() ? `${tip}, an open lineup spot at what a streamer would score` : tip;
   }

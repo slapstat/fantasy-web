@@ -188,7 +188,7 @@
                 </span>
                 <!-- On a phone the gain column is off the screen, so the gain rides in the
                      frozen player cell instead; the stylesheet shows one or the other. -->
-                @if (gaining() && pickable(entry.row)) {
+                @if (gaining() && priced(entry.row)) {
                   <span class="player-gains">
                     <span class="player-gain" [class.player-gain--top]="isTopGain(entry.row)">
                       <span class="player-gain-label">Lineup +/&minus;</span>
@@ -199,7 +199,13 @@
                         <span class="gain-unknown">?</span>
                       }
                     </span>
-                    @if (scoreGain(entry.row); as more) {
+                    @if (isTrade(entry.row)) {
+                      <span
+                        class="player-gain player-gain--note"
+                        [appTooltip]="theirGainTip(entry.row)"
+                        >Them {{ theirGain(entry.row)?.text ?? '?' }}</span
+                      >
+                    } @else if (scoreGain(entry.row); as more) {
                       <span class="player-gain player-gain--note">{{ more.text }} proj</span>
                     }
                   </span>
@@ -249,13 +255,19 @@
             <!-- The lineup's figure, and under it, small and grey as a note under any figure, his
                  projection less the drop's: the plain difference the lineup's room then cuts. -->
             <td class="num gain-col stat-col--start" [class.gain-col--top]="isTopGain(entry.row)">
-              @if (pickable(entry.row)) {
+              @if (priced(entry.row)) {
                 @if (gain(entry.row); as gain) {
                   <span class="figure-now gain gain--{{ gain.dir }}">{{ gain.text }}</span>
                 } @else {
                   <span class="figure-now gain-unknown">?</span>
                 }
-                @if (scoreGain(entry.row); as more) {
+                <!-- A trade has two sides: under the user's figure, the other team's, so a swap
+                     both lineups gain by, the one likely to be accepted, reads at a glance. -->
+                @if (isTrade(entry.row)) {
+                  <span class="delta delta--note" [appTooltip]="theirGainTip(entry.row)"
+                    >Them {{ theirGain(entry.row)?.text ?? '?' }}</span
+                  >
+                } @else if (scoreGain(entry.row); as more) {
                   <span class="delta delta--note" [appTooltip]="scoreGainTip()"
                     >{{ more.text }} proj</span
                   >

@@ -76,6 +76,7 @@ import {
   sortScout,
 } from './scout-ranking';
 import { ScoutTableComponent } from './scout-table/scout-table';
+import { otherRosters, tradeable } from './trade-roster';
 import { LensSwitchComponent } from './lens-switch/lens-switch';
 import { DropChipComponent } from './drop-chip/drop-chip';
 import {
@@ -549,6 +550,12 @@ export class PlayerScoutComponent {
 
   /** Whether the Position-adjusted ranking is offered here at all, which the BFF decides. */
   readonly positionAdjustedOffered = this.features.playerScoutPositionAdjusted;
+
+  /**
+   * Whether the lineup column prices players other teams hold too, as a one-for-one trade for
+   * the player the user gives: never where the BFF does not offer it (`playerScoutTrades`).
+   */
+  readonly tradesOffered = this.features.playerScoutTrades;
 
   private readonly positionAdjustedPicked = signal(false);
 
@@ -1232,7 +1239,12 @@ export class PlayerScoutComponent {
     if (drop === null && this.fullRoster()) {
       return null;
     }
-    const pickups = this.filtered().filter((row) => row.scout.owner === null);
+    // With a player to give, one another team holds is a one-for-one trade: the same question
+    // as a pickup, him in and the drop out, so the same pricing answers it.
+    const trading = drop !== null && this.tradesOffered();
+    const pickups = this.filtered().filter(
+      (row) => row.scout.owner === null || (trading && tradeable(row)),
+    );
     if (pickups.length === 0) {
       return null;
     }
@@ -1251,6 +1263,62 @@ export class PlayerScoutComponent {
       gains.set(row.player.playerId, pricing.gainFor(this.pickupOf(row, units)));
     }
     return gains;
+  });
+
+  /** Every other team's roster, weighed as the user's is, for the other side of a trade. */
+  private readonly rosters = computed(() => otherRosters(this.ranked()));
+
+  /** Every player's row in the league list, by platform id. */
+  private readonly rowsById = computed<ReadonlyMap<string, ScoutRow>>(
+    () => new Map(this.ranked().map((row) => [row.player.playerId, row])),
+  );
+
+  /**
+   * The other side of each trade on the page: what the team holding him gains over the rest of
+   * the season by giving him for the user's drop, priced as the user's side is, without the
+   * streaming spots only the user has marked. Only the page's rows: each holds a different
+   * player out of a different lineup, so each is a pricing of its own, and a thousand of those
+   * would cost seconds for figures nobody sees. Null with no trade on; a player is null in it
+   * where his side could not be priced.
+   */
+  readonly theirGains = computed<ReadonlyMap<string, number | null> | null>(() => {
+    const drop = this.drop();
+    const slots = this.slots();
+    const schedule = this.schedule();
+    if (!this.tradesOffered() || drop === null || !slots || schedule.size === 0) {
+      return null;
+    }
+    const targets = this.visible().filter(tradeable);
+    if (targets.length === 0) {
+      return null;
+    }
+    const rows = this.rowsById();
+    const given = rows.get(drop.player.playerId);
+    const units = this.units();
+    const answers = new Map<string, number | null>();
+    const score = (playerId: string) => rows.get(playerId)?.score ?? null;
+    const answer = this.teamResource.hasValue() ? this.teamResource.value() : null;
+    const weights: NightWeights =
+      answer && units
+        ? {
+            worth: answer.worth,
+            shares: (playerId) => {
+              const row = rows.get(playerId);
+              return row ? statShares(row.line, units) : null;
+            },
+          }
+        : EVEN_NIGHTS;
+    for (const row of targets) {
+      const roster = this.rosters().get(row.scout.owner?.teamName ?? '');
+      const out = roster?.find((player) => player.playerId === row.player.playerId);
+      if (!given || !roster || !out) {
+        answers.set(row.player.playerId, null);
+        continue;
+      }
+      const pricing = priceDrop(out, roster, slots, schedule, score, weights, NO_STREAMING);
+      answers.set(row.player.playerId, pricing.gainFor(this.pickupOf(given, units)));
+    }
+    return answers;
   });
 
   /** "1 open roster spot", "2 open roster spots". */

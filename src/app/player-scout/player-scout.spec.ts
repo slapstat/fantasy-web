@@ -193,9 +193,11 @@ describe('PlayerScoutComponent', () => {
   let myTeam: ReturnType<typeof vi.fn<() => Observable<ScoutTeamAnswer>>>;
   let settings: LeagueProjectionSettingsResponse;
   let positionAdjustedOffered: boolean;
+  let tradesOffered: boolean;
 
   beforeEach(() => {
     positionAdjustedOffered = true;
+    tradesOffered = false;
     localStorage.removeItem(STREAMERS_KEY);
     chosen = LEAGUE;
     settings = SETTINGS;
@@ -227,6 +229,7 @@ describe('PlayerScoutComponent', () => {
       .mock(EspnService, { leagueProjectionSettings: () => of(SETTINGS) })
       .mock(FeatureService, {
         playerScoutPositionAdjusted: () => positionAdjustedOffered,
+        playerScoutTrades: () => tradesOffered,
       } as never);
   });
 
@@ -1061,6 +1064,89 @@ describe('PlayerScoutComponent', () => {
     page.pickDrop('404');
     expect(page.gains()?.get('99')).toBeCloseTo(30);
     expect(page.gains()?.get('98')).toBeCloseTo(-20);
+  });
+
+  describe('trades', () => {
+    const RIVALS: ScoutOwner = { teamName: 'Rivals', mine: false };
+    // Two centre seats, one defence seat and a bench spot, for both teams.
+    const SLOTS = { c: 2, lw: 0, rw: 0, w: 0, f: 0, d: 1, g: 0, util: 0, bn: 1 };
+    const mine: [Projection, string[]][] = [
+      [skater(401, 20, 20), ['C']],
+      [skater(402, 16, 16), ['C']],
+      [skater(403, 12, 12), ['C']],
+      [skater(404, 4, 4), ['D']],
+    ];
+    // Their only defenceman is the target: giving him empties their D seat.
+    const theirs: [Projection, string[]][] = [
+      [skater(501, 18, 18), ['D']],
+      [skater(502, 10, 10), ['C']],
+      [skater(503, 8, 8), ['C']],
+      [skater(504, 6, 6), ['C']],
+    ];
+
+    beforeEach(() => {
+      settings = { ...SETTINGS, rosterSlots: SLOTS };
+      myTeam.mockReturnValue(
+        of({
+          team: {
+            found: true,
+            teamName: 'Slapshots',
+            players: mine.map(([line, positions]) => teamPlayer(line, positions)),
+          },
+          schedule: new Map([
+            ['EDM', NIGHTS],
+            ['SEA', NIGHTS],
+          ]),
+          worth: new Map(),
+        }),
+      );
+      players.mockReturnValue(
+        of({
+          ...league(),
+          players: [
+            scoutPlayer(skater(99, 10, 10), skater(99, 4, 4), ['D']),
+            ...mine.map(([line, positions]) => scoutPlayer(line, line, positions, MINE)),
+            ...theirs.map(([line, positions]) => scoutPlayer(line, line, positions, RIVALS)),
+          ],
+        }),
+      );
+    });
+
+    it("prices another team's player as a trade for the drop, both sides, only where the BFF offers it", async () => {
+      tradesOffered = true;
+      const fixture = await render();
+      const page = fixture.point.componentInstance;
+      page.pool.set('all');
+
+      // No player to give yet: nothing is priced, a trade least of all.
+      expect(page.theirGains()).toBeNull();
+      page.pickDrop('403');
+
+      // The benched centre out, their defenceman into the D seat over the user's weakest.
+      const ours = page.gains()?.get('501') ?? null;
+      expect(ours).not.toBeNull();
+      expect(ours!).toBeGreaterThan(0);
+      // The same figure a free agent at his position and club would get: one pricing for both.
+      expect(page.gains()?.has('99')).toBe(true);
+      // Their D seat stands empty, and the centre they get starts over one of theirs: a loss.
+      const them = page.theirGains()?.get('501') ?? null;
+      expect(them).not.toBeNull();
+      expect(them!).toBeLessThan(0);
+      // The user's own players are no trade.
+      expect(page.gains()?.has('401')).toBe(false);
+      expect(page.theirGains()?.has('401')).toBe(false);
+    });
+
+    it('prices no trade where the BFF does not offer it', async () => {
+      const fixture = await render();
+      const page = fixture.point.componentInstance;
+      page.pool.set('all');
+      page.pickDrop('403');
+
+      expect(page.gains()?.has('99')).toBe(true);
+      expect(page.gains()?.has('501')).toBe(false);
+      expect(page.theirGains()).toBeNull();
+    });
   });
 
   it('starts the other of two near-equal defencemen on the night his opponent is the softer', async () => {

@@ -19,6 +19,11 @@ import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
 export class DropChipComponent {
   /** The drop's name. */
   readonly name = input.required<string>();
+  /**
+   * Whether the list prices trades as well as pickups: the player picked then goes either way,
+   * dropped for a free agent or traded for another team's player, so the chip says neither.
+   */
+  readonly trading = input(false);
 
   /** The words: the roster, to pick another drop. */
   readonly pickAnother = output<void>();
