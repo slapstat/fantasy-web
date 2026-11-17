@@ -13,21 +13,17 @@
            player column on every screen. -->
       <tr>
         <th scope="col" class="num rank-col" [attr.aria-sort]="ariaSort(keyOf('rank'))">
-          @if (keyOf('rank'); as key) {
-            <button
-              type="button"
-              class="sort"
-              [appTooltip]="rankChangeTip()"
-              (click)="sortBy.emit(key)"
-            >
-              @if (arrow(key); as arrow) {
-                <app-icon [name]="arrow" [size]="14" />
-              }
-              #
-            </button>
-          } @else {
-            <span class="heading" [appTooltip]="rankTip()">#</span>
-          }
+          <button
+            type="button"
+            class="sort"
+            [appTooltip]="rankSortTip()"
+            (click)="sortBy.emit(keyOf('rank'))"
+          >
+            @if (arrow(keyOf('rank')); as arrow) {
+              <app-icon [name]="arrow" [size]="14" />
+            }
+            #
+          </button>
         </th>
         <th scope="col" class="player-col" [attr.aria-sort]="ariaSort('name')">
           <button type="button" class="sort" (click)="sortBy.emit('name')">
@@ -47,7 +43,7 @@
             type="button"
             class="sort"
             [appTooltip]="changeLens() ? changeTip(scoreHeading()) : scoreTip()"
-            (click)="sortBy.emit(keyOf('score')!)"
+            (click)="sortBy.emit(keyOf('score'))"
           >
             @if (arrow(keyOf('score')); as arrow) {
               <app-icon [name]="arrow" [size]="14" />
@@ -75,7 +71,7 @@
             type="button"
             class="sort"
             [appTooltip]="changeLens() ? changeTip('games left') : 'Projected games left'"
-            (click)="sortBy.emit(keyOf('games')!)"
+            (click)="sortBy.emit(keyOf('games'))"
           >
             @if (arrow(keyOf('games')); as arrow) {
               <app-icon [name]="arrow" [size]="14" />
@@ -89,7 +85,7 @@
               type="button"
               class="sort"
               [appTooltip]="changeLens() ? changeTip('ice time') : 'Projected ice time per game'"
-              (click)="sortBy.emit(keyOf('toi')!)"
+              (click)="sortBy.emit(keyOf('toi'))"
             >
               @if (arrow(keyOf('toi')); as arrow) {
                 <app-icon [name]="arrow" [size]="14" />
@@ -104,7 +100,7 @@
               type="button"
               class="sort"
               [appTooltip]="changeLens() ? changeTip(column.name) : column.name"
-              (click)="sortBy.emit(keyOf(column.key)!)"
+              (click)="sortBy.emit(keyOf(column.key))"
             >
               @if (arrow(keyOf(column.key)); as arrow) {
                 <app-icon [name]="arrow" [size]="14" />

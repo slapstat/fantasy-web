@@ -1063,7 +1063,7 @@ export class PlayerScoutComponent {
     if (this.shown() !== 'goalies') {
       figures.push('toi');
     }
-    const about: ScoutSortKey[] = ['name', ...figures];
+    const about: ScoutSortKey[] = ['name', 'rank', ...figures];
     if (this.compare()) {
       about.push('delta', 'rise');
       for (const figure of figures) {

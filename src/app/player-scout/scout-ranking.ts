@@ -186,13 +186,13 @@ export type ChangeKey = 'games' | 'toi' | ScoringStatKey;
 export type ChangeSortKey = `change:${ChangeKey}`;
 
 /**
- * A column the list can be sorted by: the planner's; the change in score, the places gained and
- * the change in any other figure since the chosen day; and, against the chosen drop, his
- * projection less the drop's and what the lineup gains by him; and his score over his
- * position's replacement, in a position-adjusted ranking.
+ * A column the list can be sorted by: the planner's; the rank the # column writes; the change
+ * in score, the places gained and the change in any other figure since the chosen day; and,
+ * against the chosen drop, his projection less the drop's and what the lineup gains by him; and
+ * his score over his position's replacement, in a position-adjusted ranking.
  */
 export type ScoutSortKey =
-  FreeAgentSortKey | 'delta' | 'rise' | 'gain' | 'adjusted' | ChangeSortKey;
+  FreeAgentSortKey | 'rank' | 'delta' | 'rise' | 'gain' | 'adjusted' | ChangeSortKey;
 
 export interface ScoutSort {
   readonly key: ScoutSortKey;
@@ -243,6 +243,9 @@ export function sortInLens(sort: ScoutSort, lens: ScoutLens, adjusted: boolean):
       case 'score':
       case 'adjusted':
         return { key: 'delta', descending };
+      case 'rank':
+        // The rank runs best first ascending, the places gained descending.
+        return { key: 'rise', descending: !descending };
       case 'name':
       case 'rostered':
       case 'gain':
@@ -266,6 +269,7 @@ export function sortInLens(sort: ScoutSort, lens: ScoutLens, adjusted: boolean):
 /** Whether the key is one of the scout's own, which the planner's sort knows nothing of. */
 function isScoutKey(key: ScoutSortKey): key is Exclude<ScoutSortKey, FreeAgentSortKey> {
   return (
+    key === 'rank' ||
     key === 'delta' ||
     key === 'rise' ||
     key === 'gain' ||
@@ -275,13 +279,16 @@ function isScoutKey(key: ScoutSortKey): key is Exclude<ScoutSortKey, FreeAgentSo
 }
 
 /**
- * Sorts by a column, best first, whichever end of the scale that is: the furthest risen first,
- * the biggest change for the better first, and every other column as the planner sorts it. The
- * same column again turns the order round.
+ * Sorts by a column, best first, whichever end of the scale that is: rank 1 first, the furthest
+ * risen first, the biggest change for the better first, and every other column as the planner
+ * sorts it. The same column again turns the order round.
  */
 export function nextScoutSort(current: ScoutSort, key: ScoutSortKey): ScoutSort {
   if (current.key === key) {
     return { key, descending: !current.descending };
+  }
+  if (key === 'rank') {
+    return { key, descending: false };
   }
   if (isScoutKey(key)) {
     return { key, descending: true };
@@ -328,6 +335,8 @@ function scoutSortValue(
   gains: ReadonlyMap<string, number | null>,
 ): number | null {
   switch (key) {
+    case 'rank':
+      return row.rank;
     case 'delta':
       return row.delta;
     case 'rise':
