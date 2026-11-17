@@ -1,0 +1,23 @@
+<!-- One pill in two halves, as the comparison's is: the words open the roster, the cross lets
+     the drop go. -->
+<span class="drop">
+  <button
+    type="button"
+    class="drop-btn"
+    [appTooltip]="'Pick another drop'"
+    (click)="pickAnother.emit()"
+  >
+    <app-icon class="drop-icon" name="user-minus" [size]="14" />
+    <span class="drop-lead">Dropping</span>&ngsp;
+    <span class="drop-name">{{ name() }}</span>
+  </button>
+  <button
+    type="button"
+    class="drop-clear"
+    [appTooltip]="'Clear drop'"
+    [attr.aria-label]="'Clear drop'"
+    (click)="cleared.emit()"
+  >
+    <app-icon name="close" [size]="14" />
+  </button>
+</span>

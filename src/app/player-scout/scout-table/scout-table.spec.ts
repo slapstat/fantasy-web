@@ -515,7 +515,7 @@ describe('ScoutTableComponent', () => {
       sortBy,
     });
 
-    // One line: the drop is named by the swap bar above the list, not again under the heading.
+    // One line: the drop is named by the drop chip above the list, not again under the heading.
     expect(ngMocks.formatText(ngMocks.find(fixture, 'th.gain-col'))).toBe('Lineup +/−');
     expect(ngMocks.findAll(fixture, 'thead th button + *')).toHaveLength(0);
     expect(ngMocks.findAll(fixture, 'td[tabindex]')).toHaveLength(0);

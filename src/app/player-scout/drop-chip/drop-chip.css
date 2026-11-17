@@ -1,0 +1,93 @@
+/* The drop as a pill on the toolbar, drawn as the comparison's pill is in rest: white, outlined,
+   navy ink, the cross its other end. Not filled: the drop is whom the figures are read against,
+   not a filter switched on, and the room line above already shows him pressed. */
+:host {
+  display: inline-block;
+  min-width: 0;
+}
+
+.drop {
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.drop-btn,
+.drop-clear {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  color: var(--color-primary);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  transition: background var(--transition-fast);
+  white-space: nowrap;
+}
+
+.drop-btn {
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+  border-right: none;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: 0.3rem 0.5rem 0.3rem 0.6rem;
+}
+
+.drop-clear {
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  flex: none;
+  padding: 0.3rem 0.55rem 0.3rem 0.45rem;
+  position: relative;
+}
+
+/* The hairline between the halves, shorter than the pill, so the two read as one piece. */
+.drop-clear::before {
+  background: var(--color-border);
+  bottom: 25%;
+  content: '';
+  left: 0;
+  position: absolute;
+  top: 25%;
+  width: 1px;
+}
+
+.drop-btn:hover,
+.drop-clear:hover {
+  background: var(--color-surface-hover);
+}
+
+/* The ring sits over the neighbouring half, not under it. */
+.drop-btn:focus-visible,
+.drop-clear:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  position: relative;
+  z-index: 1;
+}
+
+.drop-icon {
+  color: var(--color-text-subtle);
+  flex: none;
+}
+
+/* The fixed half of the sentence a shade quieter than the name, as "Change since" is. */
+.drop-lead {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-medium);
+}
+
+.drop-name {
+  font-weight: var(--weight-semibold);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A finger's worth of cross on a phone. */
+@media (max-width: 640px) {
+  .drop-clear {
+    padding-left: 0.55rem;
+    padding-right: 0.7rem;
+  }
+}

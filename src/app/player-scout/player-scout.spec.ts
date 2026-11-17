@@ -24,7 +24,7 @@ import { YahooLeaguePicker } from '../shared/yahoo-league-picker';
 import { PlayerScoutComponent, SCOUT_PAGE_SIZE, surname } from './player-scout';
 import { LensSwitchComponent } from './lens-switch/lens-switch';
 import { ScoutTableComponent } from './scout-table/scout-table';
-import { SwapBarComponent } from './swap-bar/swap-bar';
+import { DropChipComponent } from './drop-chip/drop-chip';
 import { CompareMenuComponent } from './compare-menu/compare-menu';
 
 const LEAGUE: ChosenLeague = { platform: 'YAHOO', leagueId: '465.l.9', name: 'The Gordie Howes' };
@@ -852,11 +852,12 @@ describe('PlayerScoutComponent', () => {
     expect(page.drop()).toBeNull();
   });
 
-  it('holds the drop picked in a swap bar over the list, sorted by the gain over him', async () => {
+  it("holds the drop picked in a chip on the list's held toolbar, sorted by the gain over him", async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
-    // No drop, no bar.
-    expect(ngMocks.findAll(fixture, SwapBarComponent)).toHaveLength(0);
+    // No drop, no chip, and the toolbar scrolls with the list.
+    expect(ngMocks.findAll(fixture, DropChipComponent)).toHaveLength(0);
+    expect(ngMocks.find(fixture, '.compare-line').classes['compare-line--held']).toBeFalsy();
     page.sortBy('name');
     expect(page.sort().key).toBe('name');
 
@@ -865,10 +866,9 @@ describe('PlayerScoutComponent', () => {
 
     // A pick sorts by what each pickup gains the lineup over him, whatever the order was.
     expect(page.sort()).toEqual({ key: 'gain', descending: true });
-    const bar = ngMocks.find(fixture, SwapBarComponent);
+    const bar = ngMocks.find(fixture, DropChipComponent);
     expect(ngMocks.input(bar, 'name')).toBe('Mine 202');
-    expect(ngMocks.input(bar, 'loss')).toBe(page.dropCost(page.drop()!));
-    expect(ngMocks.input(bar, 'unit')).toBe('points');
+    expect(ngMocks.find(fixture, '.compare-line').classes['compare-line--held']).toBe(true);
 
     // Change unfolds the whole roster under the room line, and brings it into view.
     const scroll = vi.fn();
@@ -880,11 +880,11 @@ describe('PlayerScoutComponent', () => {
     expect(scroll).toHaveBeenCalledTimes(1);
     expect(page.drop()?.player.playerId).toBe('202');
 
-    // The cross lets him go, the bar with him, and the list back to its ranked order.
+    // The cross lets him go, the chip with him, and the list back to its ranked order.
     ngMocks.output(bar, 'cleared').emit();
     fixture.detectChanges();
     expect(page.drop()).toBeNull();
-    expect(ngMocks.findAll(fixture, SwapBarComponent)).toHaveLength(0);
+    expect(ngMocks.findAll(fixture, DropChipComponent)).toHaveLength(0);
     expect(page.sort().key).not.toBe('gain');
   });
 
