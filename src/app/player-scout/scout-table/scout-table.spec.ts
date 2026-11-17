@@ -308,8 +308,8 @@ describe('ScoutTableComponent', () => {
     );
 
     const tags = ngMocks.findAll(fixture, '.scout-tag').map((tag) => ngMocks.formatText(tag));
-    expect(tags).toEqual(['FA', 'Your team: Slapshots', 'Someone Else']);
-    expect(ngMocks.findAll(fixture, '.scout-tag--free')).toHaveLength(1);
+    // A free agent wears no tag: the taken rows' names and tone already set him apart.
+    expect(tags).toEqual(['Your team: Slapshots', 'Someone Else']);
     const mine = ngMocks.findAll(fixture, '.scout-tag--mine');
     expect(mine).toHaveLength(1);
     expect(ngMocks.formatText(mine[0])).toBe('Your team: Slapshots');
@@ -332,9 +332,8 @@ describe('ScoutTableComponent', () => {
 
     const withOwners = render(rows, { showOwner: true });
     expect(ngMocks.findAll(withOwners, '.scout-tag').map((tag) => ngMocks.formatText(tag))).toEqual(
-      ['FA', 'Waivers'],
+      ['Waivers'],
     );
-    // Yellow for the claim, a wait; the add keeps the green.
     expect(ngMocks.findAll(withOwners, '.scout-tag--waivers')).toHaveLength(1);
   });
 

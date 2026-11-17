@@ -399,18 +399,18 @@ export class ScoutTableComponent {
   }
 
   /**
-   * The pill a pickable row wears: "Waivers" always, since a claim changes what the reader does
-   * next; "FA" only on a list that also holds taken players, where it is the mark to scan for.
-   * A taken player wears none.
+   * The mark a pickable row wears: "Waivers" only, since a claim changes what the reader does
+   * next. A free agent wears none: on a list that also holds taken players, the taken ones step
+   * back a tone and carry their team's name, which already sets the free apart, and a green "FA"
+   * on top of that was a third saying of the same thing.
    */
   availabilityTag(row: ScoutRow): string | null {
-    if (!this.pickable(row)) {
-      return null;
-    }
-    if (this.onWaivers(row)) {
-      return 'Waivers';
-    }
-    return this.showOwner() ? 'FA' : null;
+    return this.pickable(row) && this.onWaivers(row) ? 'Waivers' : null;
+  }
+
+  /** Where today's lineup page lists him, `F2 · PP1`; null when it gives him no role. */
+  lineupTag(row: ScoutRow): string | null {
+    return listingLabel(row.scout.lineup);
   }
 
   /**
@@ -418,11 +418,6 @@ export class ScoutTableComponent {
    * It read "Mine" there once, and "Mine" beside a column of team names looked like one more
    * team; the template marks the user's own by look instead.
    */
-  /** Where today's lineup page lists him, `F2 · PP1`; null when it gives him no role. */
-  lineupTag(row: ScoutRow): string | null {
-    return listingLabel(row.scout.lineup);
-  }
-
   ownerTag(row: ScoutRow): string {
     return row.scout.owner?.teamName ?? 'FA';
   }

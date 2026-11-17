@@ -87,11 +87,12 @@
   text-align: right;
 }
 
-/* A tag beside the positions: what the row is, not another position. Only two kinds are filled,
-   and never on the same row: the pickable wear green, "FA" or "Waivers", and the user's own team
-   the fill the league table's You badge wears, with a figure in front of the name so neither mark
-   is colour alone. Rising is what a comparison is there to find, so it is outlined in green.
-   Another team's name is plain text, no chip: who holds him is context, not a thing to find. */
+/* A tag beside the positions: what the row is, not another position. Only one kind is filled: the
+   user's own team, in the fill the league table's You badge wears, with a figure in front of the
+   name so the mark is not colour alone. A free agent wears no tag; the ink of the row says it.
+   A claim is brown ink with the hourglass, no fill. Rising is what a comparison is there to find,
+   so it is outlined in green. Another team's name is plain text, no chip: who holds him is
+   context, not a thing to find. */
 .scout-tag {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
@@ -111,30 +112,24 @@
   color: var(--color-success);
 }
 
-.scout-tag--free,
+.scout-tag--waivers,
 .scout-tag--mine {
   align-items: center;
   display: inline-flex;
   gap: 0.2rem;
 }
 
-.scout-tag--free app-icon,
+.scout-tag--waivers app-icon,
 .scout-tag--mine app-icon {
   flex: none;
 }
 
-.scout-tag--free {
-  background: var(--color-success);
-  border-color: var(--color-success);
-  color: var(--color-primary-contrast);
-}
-
-/* A claim is pickable too, but not now: the yellow says wait where the green says go. The brown
-   ink reads 4.6:1 on it; white cannot sit on this yellow. */
+/* A claim is pickable too, but not now: the word and the hourglass say wait, in the warning's
+   brown ink set flush like the lineup role beside it, not in a yellow fill that outshouts the row. */
 .scout-tag--waivers {
-  background: var(--color-warning);
-  border-color: var(--color-warning);
+  border-color: transparent;
   color: var(--color-warning-text);
+  padding-inline: 0;
 }
 
 .scout-tag--mine {

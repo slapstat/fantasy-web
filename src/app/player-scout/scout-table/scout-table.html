@@ -153,21 +153,17 @@
                     <app-position-chips [positions]="entry.row.player.positions" />
                   </span>
                   <!-- What the row is to the reader: one he can pick up, his own, or another team's.
-                       The pickable wear the one filled pill in the column, so the eye finds them
-                       without reading: green "FA" for an add, yellow "Waivers" with the hourglass
-                       for a claim, which is a wait and not a pickup; "FA" is left off a list of
-                       nothing else. His
-                       own team is the filled pill the league table's You badge wears, with a figure
-                       in front of the name so the mark is not colour alone. Another team's name is
-                       plain text, no chip: it is context, not something to find. -->
+                       Free or taken is said once, by the ink: another team's player steps back a
+                       tone with the team's name beside him as plain text, and a free agent keeps
+                       full ink and wears nothing. A green "FA" pill on every free row was a third
+                       way of saying what those two already said, and the loudest thing in the
+                       table. A claim still says so, in words with the hourglass, because a claim
+                       is a wait and not a pickup; it is ink, not a fill. His own team is the filled
+                       pill the league table's You badge wears, with a figure in front of the name
+                       so the mark is not colour alone. -->
                   @if (availabilityTag(entry.row); as tag) {
-                    <span
-                      class="scout-tag scout-tag--free"
-                      [class.scout-tag--waivers]="onWaivers(entry.row)"
-                    >
-                      @if (onWaivers(entry.row)) {
-                        <app-icon name="hourglass" [size]="14" />
-                      }
+                    <span class="scout-tag scout-tag--waivers">
+                      <app-icon name="hourglass" [size]="14" />
                       <span class="scout-tag-name">{{ tag }}</span>
                     </span>
                   } @else if (showOwner() && entry.row.scout.owner?.mine) {
