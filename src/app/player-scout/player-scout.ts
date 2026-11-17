@@ -65,7 +65,6 @@ import {
   changeSortKey,
   nextScoutSort,
   rankScout,
-  SCOUT_MOVERS_ORDER,
   SCOUT_ADJUSTED_ORDER,
   SCOUT_GAIN_ORDER,
   SCOUT_RANKED_ORDER,
@@ -237,16 +236,17 @@ export class PlayerScoutComponent {
   }
 
   /**
-   * The comparison on, and the list in the order the comparison is for: the players the model
-   * makes the most more of since the day, the headings sorting by each figure's change. Off
-   * again, the ranked order comes back of itself ({@link sort}), unless the reader has sorted by
-   * something else since.
+   * The comparison on, the list in the order it was already in: today's projection unless the
+   * reader sorted by something else. The biggest change is not the default, since the players the
+   * model makes the most more of are mostly call-ups whose games went from a handful to most of a
+   * season, rarely anyone a league plays (Alexander, 2026-11-17). The headings sort by the figures
+   * until the switch moves them onto the changes.
    */
   private switchOn(): void {
     if (!this.compare()) {
+      this.sortPicked.set(this.sort());
       this.compare.set(true);
-      this.lensPicked.set('change');
-      this.sortPicked.set(SCOUT_MOVERS_ORDER);
+      this.lensPicked.set('value');
     }
   }
 
@@ -255,7 +255,7 @@ export class PlayerScoutComponent {
     this.compare.set(false);
   }
 
-  private readonly lensPicked = signal<ScoutLens>('change');
+  private readonly lensPicked = signal<ScoutLens>('value');
 
   /**
    * What the headings sort by: each figure, or, with a comparison on and the reader not having
