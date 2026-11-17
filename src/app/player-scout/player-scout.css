@@ -893,9 +893,3 @@ select:focus-visible,
     gap: var(--space-2);
   }
 }
-
-/* Where the lineup column would be, the one line that asks for the drop it waits on. */
-.gain-hint {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
