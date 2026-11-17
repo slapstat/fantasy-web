@@ -421,7 +421,7 @@ describe('PlayerScoutComponent', () => {
     expect(ngMocks.findAll(fixture, '.mover')).toHaveLength(0);
   });
 
-  it('sorts by the change in score when the comparison comes on, says so by the count, and goes back to ranked when it goes off', async () => {
+  it('keeps the projection order when the comparison comes on, and says so by the count once sorted by a change', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
     expect(page.orderText()).toBe('');
@@ -430,7 +430,12 @@ describe('PlayerScoutComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(page.sort()).toEqual({ key: 'delta', descending: true });
+    // Call-ups make the biggest changes, so the list stays on today's projection.
+    expect(page.sort()).toEqual({ key: 'score', descending: true });
+    expect(page.orderText()).toBe('');
+
+    page.sortBy('delta');
+    fixture.detectChanges();
     expect(ids(page.sorted())[0]).toBe('99');
     expect(page.orderText()).toBe('Sorted by the change in Points vs 7 Oct');
     expect(ngMocks.formatText(ngMocks.find(fixture, '.list-count'))).toContain(
@@ -444,21 +449,24 @@ describe('PlayerScoutComponent', () => {
     expect(page.sort()).toEqual({ key: 'score', descending: true });
     expect(page.orderText()).toBe('');
 
-    // A column of the reader's own survives off, and on again is the change once more.
+    // A column of the reader's own survives off and on again; a change of his own does not.
     page.pickSince(null);
     await fixture.whenStable();
     page.sortBy('change:goals');
     expect(page.orderText()).toBe('Sorted by the change in Goals vs 7 Oct');
     page.sortBy('rise');
     expect(page.orderText()).toBe('Sorted by the change in Rank vs 7 Oct');
+    page.clearCompare();
+    page.pickSince(null);
+    expect(page.sort()).toEqual({ key: 'score', descending: true });
     page.sortBy('games');
     page.clearCompare();
     expect(page.sort()).toEqual({ key: 'games', descending: true });
     page.pickSince(null);
-    expect(page.sort()).toEqual({ key: 'delta', descending: true });
+    expect(page.sort()).toEqual({ key: 'games', descending: true });
   });
 
-  it('opens the comparison on the change lens, and the switch moves the order to the same column read the other way', async () => {
+  it('opens the comparison on the figures lens, and the switch moves the order to the same column read the other way', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
     expect(page.lens()).toBe('value');
@@ -466,10 +474,14 @@ describe('PlayerScoutComponent', () => {
     page.pickSince('2026-10-07');
     await fixture.whenStable();
     fixture.detectChanges();
-    expect(page.lens()).toBe('change');
-    expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'lens')).toBe('change');
+    expect(page.lens()).toBe('value');
+    expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'lens')).toBe('value');
     const lensSwitch = ngMocks.find(fixture, LensSwitchComponent);
-    expect(ngMocks.input(lensSwitch, 'lens')).toBe('change');
+    expect(ngMocks.input(lensSwitch, 'lens')).toBe('value');
+
+    ngMocks.output(lensSwitch, 'picked').emit('change');
+    expect(page.lens()).toBe('change');
+    expect(page.sort()).toEqual({ key: 'delta', descending: true });
 
     page.sortBy('change:goals');
     ngMocks.output(lensSwitch, 'picked').emit('value');
@@ -478,13 +490,12 @@ describe('PlayerScoutComponent', () => {
     page.pickLens('change');
     expect(page.sort()).toEqual({ key: 'change:goals', descending: true });
 
-    // Off, the headings sort by the figures; on again opens on the changes once more.
-    page.pickLens('value');
+    // Off, the headings sort by the figures; on again opens on the figures once more.
     page.clearCompare();
     expect(page.lens()).toBe('value');
     page.pickSince(null);
-    expect(page.lens()).toBe('change');
-    expect(page.sort()).toEqual({ key: 'delta', descending: true });
+    expect(page.lens()).toBe('value');
+    expect(page.sort()).toEqual({ key: 'score', descending: true });
   });
 
   it("shows free agents, waivers, taken players, everyone, or one team's roster", async () => {
@@ -1214,7 +1225,8 @@ describe('PlayerScoutComponent', () => {
 
     expect(page.sinceLabel()).toBe('no earlier projection');
     expect(page.sinceCaption()).toEqual('No earlier projection to compare with yet.');
-    // The list is sorted by the change, but there is no day to say it is against.
+    // Sorted by the change, there is still no day to say it is against.
+    page.sortBy('delta');
     expect(page.sort()).toEqual({ key: 'delta', descending: true });
     expect(page.orderText()).toBe('');
   });
