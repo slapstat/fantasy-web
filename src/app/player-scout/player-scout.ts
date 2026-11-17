@@ -638,6 +638,20 @@ export class PlayerScoutComponent {
     () => filterByPositions(this.inPool(), this.positions()) as readonly ScoutRow[],
   );
 
+  /**
+   * The players the table's columns are drawn for: every player at the positions and in the
+   * lineup role picked, whoever holds him. Those two say which kinds of player the reader asked
+   * about; the pool, the club, the movers, the search, the order and the page only pick among
+   * them, and must not move a column under the reader's eye.
+   */
+  readonly columnScope = computed<readonly ScoutRow[]>(() => {
+    const role = this.lineupSeenOn() ? this.lineupRole() : null;
+    const atPositions = filterByPositions(this.ranked(), this.positions()) as readonly ScoutRow[];
+    return role === null
+      ? atPositions
+      : atPositions.filter((row) => holdsRole(row.scout.lineup, role));
+  });
+
   readonly risingCount = computed(() => this.atPositions().filter((row) => row.rising).length);
 
   readonly filtered = computed<readonly ScoutRow[]>(() => {

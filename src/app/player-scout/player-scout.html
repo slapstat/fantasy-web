@@ -510,6 +510,7 @@
         } @else {
           <app-scout-table
             [rows]="visible()"
+            [listed]="columnScope()"
             [scoringType]="scoringType()"
             [categories]="categories()"
             [compare]="compare()"

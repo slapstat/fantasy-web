@@ -72,8 +72,9 @@ export interface FreeAgentRow {
 export class FreeAgentsTableComponent {
   readonly rows = input.required<readonly RankedFreeAgent[]>();
   /**
-   * The whole list the rows are a page of, which the columns are drawn for: sorted by assists or
-   * paged on, the goalies' columns stay while no goalie is on the page. The rows alone if not given.
+   * The players the columns are drawn for: those at the positions picked, not the page or the
+   * search that came of them. Sorted by assists, paged on or searched for a name, the goalies'
+   * columns stay while no goalie is on the page. The rows alone if not given.
    */
   readonly listed = input<readonly RankedFreeAgent[]>();
   readonly scoringType = input.required<ScoringType>();

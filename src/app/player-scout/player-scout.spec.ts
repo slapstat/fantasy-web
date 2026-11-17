@@ -614,6 +614,29 @@ describe('PlayerScoutComponent', () => {
     ]);
   });
 
+  it('draws the columns for the positions and role picked, not for the pool, movers, search or order', async () => {
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    const hasGoalie = () => ids(page.columnScope()).includes('50');
+    expect(hasGoalie()).toBe(true);
+
+    // What picks among the players moves no column: the goalie's stay while no goalie is listed.
+    page.search.set('player 1');
+    page.pool.set('taken');
+    page.toggleCompare();
+    page.movers.set('risers');
+    page.sortBy('goals');
+    expect(ids(page.filtered())).not.toContain('50');
+    expect(hasGoalie()).toBe(true);
+
+    // Asking about a kind of player without goalies takes their columns.
+    page.togglePosition('D');
+    expect(hasGoalie()).toBe(false);
+    page.clearPositions();
+    page.lineupRole.set('f1');
+    expect(hasGoalie()).toBe(false);
+  });
+
   it('hands the table a page at a time, saying who holds whom only beyond the wire', async () => {
     const fixture = await render();
     const page = fixture.point.componentInstance;
