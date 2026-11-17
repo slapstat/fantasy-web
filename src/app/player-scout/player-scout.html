@@ -409,21 +409,11 @@
       <!-- The comparison, on the table's top line, so the setting sits with the columns it
            changes. The line stays through a reload, so changing the day does not take the control
            away. One button that reads as a sentence; with a comparison on, the two ways the
-           projection moved beside it, either one pressed or neither. -->
+           projection moved beside it, either one pressed or neither. With a drop picked the line
+           is held to the top of the window while the list scrolls, since every gain under it is
+           set against him. -->
       <div class="list">
-        <!-- The drop picked, held on screen while the list scrolls, since every gain under it is
-             set against him: who he is, what his going costs, a way back to the roster to pick
-             another, and a way out. -->
-        @if (drop(); as picked) {
-          <app-swap-bar
-            [name]="picked.player.name"
-            [loss]="dropLoss()"
-            [unit]="scoringType() === 'points' ? 'points' : 'Z-Score'"
-            (pickAnother)="changeDrop()"
-            (cleared)="clearDrop()"
-          />
-        }
-        <div class="compare-line">
+        <div class="compare-line" [class.compare-line--held]="drop() !== null">
           <app-compare-menu
             [on]="compare()"
             [since]="since()"
@@ -467,6 +457,15 @@
                once, rather than as a column of figures for a swap that cannot be made. -->
           @if (fullRoster() && drop() === null && dropCandidates().length > 0 && !loading()) {
             <span class="gain-hint">Pick a drop to see each pickup's lineup +/&minus;</span>
+          }
+          <!-- The drop picked, in the place that line asks for him: whom the lineup column is set
+               against, a way back to the roster to pick another, and a way out. -->
+          @if (drop(); as picked) {
+            <app-drop-chip
+              [name]="dropSurname()"
+              (pickAnother)="changeDrop()"
+              (cleared)="clearDrop()"
+            />
           }
           <!-- How many players the toolbar's answer holds, at the right of the line under it, so
                every filter pressed shows its effect at once and the line is not a lone button. -->
