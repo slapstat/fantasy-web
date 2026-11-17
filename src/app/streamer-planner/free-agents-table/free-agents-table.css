@@ -335,6 +335,30 @@ span.score {
   }
 }
 
+/* A column is as wide on every page of the list, so nothing moves as the list is sorted or paged.
+   Left to their figures, an empty goalie column on a page of skaters shrank to its label and a
+   save count in the thousands widened its own, and the player column, which takes the rest of the
+   card, moved every other column with them. Each figure column keeps room for five digits: a
+   change such as "+19.3" or a count such as "1,234", which a comparison or a goalie brings. The
+   rank keeps room for four, a place and its rise; the padding is on top. */
+.free-agents-table :is(.score-col, .stat-col) {
+  box-sizing: content-box;
+  min-width: 4.6ch;
+}
+
+.free-agents-table .rank-col {
+  box-sizing: content-box;
+  min-width: 3.6ch;
+}
+
+/* On a phone the player is capped at a third of the screen; held there too, so a page of short
+   names does not narrow it and pull the numbers left. */
+@container (max-width: 38rem) {
+  .player-cell {
+    min-width: 8.5rem;
+  }
+}
+
 /* The categories, a column each, set off from the columns about the player by a rule down the
    first, and the goalies' from the skaters' by another. */
 .free-agents-table .stat-col--start {
