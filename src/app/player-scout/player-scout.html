@@ -452,14 +452,8 @@
               </button>
             </div>
           }
-          <!-- With the roster full and no drop picked the list has no lineup column: what a
-               pickup is worth to the lineup depends on who goes. Said where the column would be,
-               once, rather than as a column of figures for a swap that cannot be made. -->
-          @if (fullRoster() && drop() === null && dropCandidates().length > 0 && !loading()) {
-            <span class="gain-hint">Pick a drop to see each pickup's lineup +/&minus;</span>
-          }
-          <!-- The drop picked, in the place that line asks for him: whom the lineup column is set
-               against, a way back to the roster to pick another, and a way out. -->
+          <!-- The drop picked: whom the lineup column is set against, a way back to the roster
+               to pick another, and a way out. -->
           @if (drop(); as picked) {
             <app-drop-chip
               [name]="picked.player.name"
