@@ -72,6 +72,13 @@ export class FeatureService {
   readonly playerScoutPositionAdjusted = computed(() =>
     this.features.hasValue() ? this.features.value().playerScoutPositionAdjusted : false,
   );
+  /**
+   * Whether Player Scout may price players other teams hold as a one-for-one trade. False until
+   * the answer lands, like the others, and whenever Player Scout itself is not served.
+   */
+  readonly playerScoutTrades = computed(() =>
+    this.features.hasValue() ? this.features.value().playerScoutTrades : false,
+  );
   /** Whether Role Changes is served here. False until the answer lands, like the others. */
   readonly roleChanges = computed(() =>
     this.features.hasValue() ? this.features.value().roleChanges : false,

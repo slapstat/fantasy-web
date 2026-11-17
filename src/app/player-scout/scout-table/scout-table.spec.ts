@@ -118,6 +118,8 @@ describe('ScoutTableComponent', () => {
     extra: {
       compare?: boolean;
       gains?: ReadonlyMap<string, number | null> | null;
+      theirGains?: ReadonlyMap<string, number | null> | null;
+      trading?: boolean;
       dropName?: string;
       dropScore?: number | null;
       streaming?: boolean;
@@ -605,6 +607,67 @@ describe('ScoutTableComponent', () => {
     expect(
       ngMocks.findAll(fixture, '.player-gain').map((line) => ngMocks.formatText(line)),
     ).toEqual(['Lineup +/− +12.5', '+25.0 proj']);
+  });
+
+  it("prices another team's player as a trade: the user's gain, and the other side's grey under it", () => {
+    const rivals = { teamName: 'Rivals', mine: false };
+    const rows = [
+      row(1, 'Brandon Montour', 1),
+      row(2, 'Nikolaj Ehlers', 2, { owner: rivals }),
+      row(3, 'Kyle Connor', 3, { owner: rivals }),
+      row(6, 'Cale Makar', 6, { owner: { teamName: 'Slapshots', mine: true } }),
+    ];
+    const fixture = render(rows, {
+      gains: new Map<string, number | null>([
+        ['1', 12.5],
+        ['2', 8.2],
+        ['3', 20],
+      ]),
+      theirGains: new Map<string, number | null>([
+        ['2', 3.1],
+        ['3', null],
+      ]),
+      trading: true,
+      showOwner: true,
+      dropName: 'Bratt',
+      dropScore: 60,
+    });
+
+    const cells = ngMocks.findAll(fixture, 'td.gain-col');
+    // The pickup keeps its projection note; a trade says what the other team gains instead, a
+    // side the page could not price as a question; the user's own player has no figure.
+    expect(cells.map((cell) => ngMocks.formatText(cell))).toEqual([
+      '+12.5+25.0 proj',
+      '+8.2Them +3.1',
+      '+20.0Them ?',
+      '',
+    ]);
+    // Their side is grey whichever way it points: green there would read as good for the user.
+    expect(ngMocks.find(cells[1], '.delta--note').nativeElement.className).not.toContain('gain--');
+    expect(
+      ngMocks.findAll(fixture, '.player-gain').map((line) => ngMocks.formatText(line)),
+    ).toEqual([
+      'Lineup +/− +12.5',
+      '+25.0 proj',
+      'Lineup +/− +8.2',
+      'Them +3.1',
+      'Lineup +/− +20.0',
+      'Them ?',
+    ]);
+  });
+
+  it('prices no trade without the switch, whatever gains it is handed', () => {
+    const fixture = render(
+      [row(2, 'Nikolaj Ehlers', 2, { owner: { teamName: 'Rivals', mine: false } })],
+      {
+        gains: new Map<string, number | null>([['2', 8.2]]),
+        dropName: 'Bratt',
+        dropScore: 60,
+      },
+    );
+
+    expect(ngMocks.formatText(ngMocks.find(fixture, 'td.gain-col'))).toBe('');
+    expect(ngMocks.findAll(fixture, '.player-gain')).toHaveLength(0);
   });
 
   it("keeps the heading one line beside the comparison, in a category league's own unit, and notes no projection gain for a drop without a projection", () => {

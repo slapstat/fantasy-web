@@ -457,6 +457,7 @@
           @if (drop(); as picked) {
             <app-drop-chip
               [name]="picked.player.name"
+              [trading]="tradesOffered()"
               (pickAnother)="changeDrop()"
               (cleared)="clearDrop()"
             />
@@ -517,6 +518,8 @@
             [sinceLabel]="sinceLabel()"
             [showOwner]="pool() === 'all' || pool() === 'taken' || showMine()"
             [gains]="gains()"
+            [theirGains]="theirGains()"
+            [trading]="tradesOffered()"
             [dropName]="dropSurname()"
             [dropScore]="drop()?.score ?? null"
             [streaming]="streaming()"
