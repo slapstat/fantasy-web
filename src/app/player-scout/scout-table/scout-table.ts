@@ -69,6 +69,13 @@ export const TOP_GAINS = 3;
 })
 export class ScoutTableComponent {
   readonly rows = input.required<readonly ScoutRow[]>();
+  /**
+   * The players the columns are drawn for: the kinds of player the reader asked for, not the page
+   * that came of it. Sorted another way, paged on or narrowed to risers, the columns stay where
+   * they were; only a filter that leaves out a kind of player takes its columns. The rows alone
+   * if not given.
+   */
+  readonly listed = input<readonly ScoutRow[]>();
   readonly scoringType = input.required<ScoringType>();
   /** The categories the league scores, in the league's order. */
   readonly categories = input.required<readonly ScoringStatKey[]>();
@@ -142,15 +149,18 @@ export class ScoutTableComponent {
     return this.rows().map((row) => ({ row, stats: lineStats(row, categories) }));
   });
 
-  /** Whether any skater is listed: only a skater has ice time to show. */
-  readonly anySkater = computed(() => this.rows().some((row) => row.line.type === 'skater'));
+  private readonly list = computed(() => this.listed() ?? this.rows());
 
-  readonly columns = computed<readonly LineColumn[]>(() =>
-    lineColumns(
-      this.lines().map((entry) => entry.stats),
-      this.categories(),
-    ),
-  );
+  /** Whether any skater is listed: only a skater has ice time to show. */
+  readonly anySkater = computed(() => this.list().some((row) => row.line.type === 'skater'));
+
+  readonly columns = computed<readonly LineColumn[]>(() => {
+    const categories = this.categories();
+    return lineColumns(
+      this.list().map((row) => lineStats(row, categories)),
+      categories,
+    );
+  });
 
   readonly entries = computed<readonly ScoutEntry[]>(() => {
     const columns = this.columns();

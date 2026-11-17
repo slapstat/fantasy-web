@@ -1,6 +1,7 @@
 import { MockBuilder, MockRender, ngMocks } from 'ng-mocks';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Projection } from '../../models/projection.model';
+import { ScoringStatKey } from '../../models/stat-key.model';
 import { ScoutPlayer } from '../../services/player-scout.service';
 import { PageListing } from '../lineup-role';
 import { ScoutRow } from '../scout-ranking';
@@ -88,9 +89,14 @@ function goalieRow(playerId: number, rank: number): ScoutRow {
     scout: {
       ...skaterRow.scout,
       type: 'goalie',
-      freeAgent: { ...skaterRow.player, projection: line, positions: ['G'] },
+      freeAgent: {
+        ...skaterRow.player,
+        projection: line,
+        positions: ['G'],
+        projected: new Set(['w']),
+      },
     },
-    player: { ...skaterRow.player, projection: line, positions: ['G'] },
+    player: { ...skaterRow.player, projection: line, positions: ['G'], projected: new Set(['w']) },
     line,
     then: null,
   };
@@ -117,12 +123,14 @@ describe('ScoutTableComponent', () => {
       streaming?: boolean;
       showOwner?: boolean;
       adjusted?: boolean;
+      listed?: ScoutRow[];
+      categories?: ScoringStatKey[];
     } = {},
   ) {
     return MockRender(ScoutTableComponent, {
       rows,
       scoringType: 'points',
-      categories: ['goals', 'assists'],
+      categories: ['goals', 'assists'] as ScoringStatKey[],
       sinceLabel: 'vs 7 Oct',
       ...extra,
     });
@@ -266,6 +274,28 @@ describe('ScoutTableComponent', () => {
 
     const goalies = render([goalieRow(2, 2)]);
     expect(ngMocks.findAll(goalies, 'th.toi-col')).toHaveLength(0);
+  });
+
+  const skaterOnly = () => [row(1, 'Brandon Montour', 1)];
+  const goalieCategories: ScoringStatKey[] = ['goals', 'assists', 'w'];
+  const headings = (fixture: ReturnType<typeof render>) =>
+    ngMocks.findAll(fixture, 'th button.sort').map((button) => ngMocks.formatText(button));
+
+  it('draws no goalie column over skaters alone when given no wider list', () => {
+    expect(headings(render(skaterOnly(), { categories: goalieCategories }))).not.toContain('W');
+  });
+
+  it('draws its columns for the players listed, not the page: a goalie off the page keeps his', () => {
+    const fixture = render(skaterOnly(), {
+      categories: goalieCategories,
+      listed: [...skaterOnly(), goalieRow(2, 2)],
+    });
+    expect(headings(fixture)).toContain('W');
+  });
+
+  it('keeps the ice time column over a page of goalies from a list with skaters', () => {
+    const fixture = render([goalieRow(2, 2)], { listed: [...skaterOnly(), goalieRow(2, 2)] });
+    expect(ngMocks.findAll(fixture, 'th.toi-col')).toHaveLength(1);
   });
 
   it('says who holds each player when asked to', () => {

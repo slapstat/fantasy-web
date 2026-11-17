@@ -1201,9 +1201,14 @@ export class StreamerPlannerComponent {
    * name searched for. Each keeps his place in the whole list, so one narrowed still says how it
    * compares.
    */
-  readonly filtered = computed(() =>
-    filterByName(filterByPositions(this.ranked(), this.positions()), this.search()),
-  );
+  /**
+   * The players at the positions picked: the kinds of player the reader asked about, which the
+   * table draws its columns for. A search only picks among them, and typing a goalie's name must
+   * not take the skaters' columns away under the reader's eye.
+   */
+  readonly atPositions = computed(() => filterByPositions(this.ranked(), this.positions()));
+
+  readonly filtered = computed(() => filterByName(this.atPositions(), this.search()));
 
   // --- The order of the list --------------------------------------------------------------------
 
