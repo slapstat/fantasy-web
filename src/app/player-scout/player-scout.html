@@ -462,7 +462,7 @@
                against, a way back to the roster to pick another, and a way out. -->
           @if (drop(); as picked) {
             <app-drop-chip
-              [name]="dropSurname()"
+              [name]="picked.player.name"
               (pickAnother)="changeDrop()"
               (cleared)="clearDrop()"
             />

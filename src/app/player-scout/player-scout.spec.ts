@@ -849,7 +849,7 @@ describe('PlayerScoutComponent', () => {
     // A pick sorts by what each pickup gains the lineup over him, whatever the order was.
     expect(page.sort()).toEqual({ key: 'gain', descending: true });
     const bar = ngMocks.find(fixture, DropChipComponent);
-    expect(ngMocks.input(bar, 'name')).toBe(page.dropSurname());
+    expect(ngMocks.input(bar, 'name')).toBe('Mine 202');
     expect(ngMocks.find(fixture, '.compare-line').classes['compare-line--held']).toBe(true);
 
     // Change unfolds the whole roster under the room line, and brings it into view.

@@ -17,7 +17,7 @@ import { TooltipDirective } from '../../shared/tooltip/tooltip.directive';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DropChipComponent {
-  /** The drop's surname. */
+  /** The drop's name. */
   readonly name = input.required<string>();
 
   /** The words: the roster, to pick another drop. */
