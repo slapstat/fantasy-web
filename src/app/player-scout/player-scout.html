@@ -462,12 +462,6 @@
               </button>
             </div>
           }
-          <!-- With the roster full and no drop picked the list has no lineup column: what a
-               pickup is worth to the lineup depends on who goes. Said where the column would be,
-               once, rather than as a column of figures for a swap that cannot be made. -->
-          @if (fullRoster() && drop() === null && dropCandidates().length > 0 && !loading()) {
-            <span class="gain-hint">Pick a drop to see each pickup's lineup +/&minus;</span>
-          }
           <!-- How many players the toolbar's answer holds, at the right of the line under it, so
                every filter pressed shows its effect at once and the line is not a lone button. -->
           @if (!failure() && !loading() && !outOfSeason() && filtered().length > 0) {

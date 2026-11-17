@@ -709,13 +709,9 @@ describe('PlayerScoutComponent', () => {
     // spot: the C on injured reserve scores lowest but holds none.
     expect(page.dropCandidates()[0]?.player.playerId).toBe('203');
     expect(page.drop()).toBeNull();
-    // The roster is full, so a pickup's worth to the lineup waits on who goes: no column, and one
-    // line asking for the drop where it would be.
+    // The roster is full, so a pickup's worth to the lineup waits on who goes: no column.
     expect(page.gains()).toBeNull();
     expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'gains')).toBeNull();
-    expect(ngMocks.formatText(ngMocks.find(fixture, '.gain-hint'))).toBe(
-      "Pick a drop to see each pickup's lineup +/−",
-    );
     expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'dropName')).toBe('');
     expect(page.valuation()?.byPlayer.get('203')?.starts).toBe(10);
     const floor = ngMocks.find(fixture, '.floor');
@@ -824,7 +820,6 @@ describe('PlayerScoutComponent', () => {
 
     // Pressing the one picked lets him go, and the lineup column with him: the roster is full.
     expect(page.gains()).not.toBeNull();
-    expect(ngMocks.findAll(fixture, '.gain-hint')).toHaveLength(0);
     page.pickDrop('201');
     expect(page.drop()).toBeNull();
     expect(page.gains()).toBeNull();
