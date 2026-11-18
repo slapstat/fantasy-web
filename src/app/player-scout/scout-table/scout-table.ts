@@ -6,7 +6,7 @@ import {
   RATE_STAT_KEYS,
   ScoringStatKey,
 } from '../../models/stat-key.model';
-import { tradeable } from '../trade-roster';
+import { OUT_STATUSES, tradeable } from '../trade-roster';
 import { IconComponent } from '../../shared/icon/icon';
 import { PositionChipsComponent } from '../../shared/position-chips/position-chips';
 import { TeamLogoComponent } from '../../shared/team-logo/team-logo';
@@ -58,6 +58,14 @@ export const TOP_GAINS = 3;
  * has chosen, one figure a row. The order is the page's to say: a heading asks for it, and the
  * page sorts the whole list before cutting it into pages.
  */
+/** ESPN spells its statuses out; the tag wears Yahoo's short forms for both platforms. */
+const INJURY_LABELS: Readonly<Record<string, string>> = {
+  DAY_TO_DAY: 'DTD',
+  OUT: 'O',
+  INJURY_RESERVE: 'IR',
+  SUSPENSION: 'SUSP',
+};
+
 @Component({
   selector: 'app-scout-table',
   imports: [IconComponent, PositionChipsComponent, TeamLogoComponent, TooltipDirective],
@@ -450,6 +458,19 @@ export class ScoutTableComponent {
   /** Where today's lineup page lists him, `F2 · PP1`; null when it gives him no role. */
   lineupTag(row: ScoutRow): string | null {
     return listingLabel(row.scout.lineup);
+  }
+
+  /**
+   * The platform's injury status in a few letters, `IR` or `DTD`, with whether it keeps him out;
+   * null for a healthy player. An injured player is usually off the lineup page too, so without
+   * this his row said nothing at all about why a top-six forward carries no role.
+   */
+  injuryTag(row: ScoutRow): { label: string; out: boolean } | null {
+    const status = row.scout.injuryStatus?.trim().toUpperCase();
+    if (!status) {
+      return null;
+    }
+    return { label: INJURY_LABELS[status] ?? status, out: OUT_STATUSES.has(status) };
   }
 
   /**
