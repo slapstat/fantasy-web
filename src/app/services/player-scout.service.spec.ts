@@ -7,6 +7,8 @@ import { playerScoutMyTeam } from '../api/fn/player-scout/player-scout-my-team';
 import { playerScoutPlayers } from '../api/fn/player-scout/player-scout-players';
 import { PlayerScoutListResponse } from '../api/models/player-scout-list-response';
 import { Projection } from '../models/projection.model';
+import { ScoutRow } from '../player-scout/scout-ranking';
+import { teamPlayerOf } from '../player-scout/trade-roster';
 import { PlayerScoutService } from './player-scout.service';
 
 /** A line's stats by key, whichever kind of player it is. */
@@ -125,6 +127,26 @@ describe('PlayerScoutService', () => {
     expect(makar.injuryStatus).toBe('DTD');
     expect(makar.freeAgent.availability).toBe('UNKNOWN');
     expect(makar.then).toBeNull();
+  });
+
+  it("reads a rival's player with no slot or injury, sent as null, as absent ones", async () => {
+    // The BFF writes an unset field as null, whatever the spec's "absent" says; the trade
+    // pricing read these as strings and threw.
+    const rival = {
+      ...ANSWER.players[1],
+      owner: { teamName: 'Rivals', mine: false },
+      slot: null,
+      injuryStatus: null,
+    } as unknown as PlayerScoutListResponse['players'][number];
+    invoke.mockResolvedValue({ ...ANSWER, players: [rival] });
+
+    const player = (await read()).players[0];
+
+    expect(player.slot).toBeUndefined();
+    expect(player.injuryStatus).toBeUndefined();
+    expect(
+      teamPlayerOf({ player: player.freeAgent, scout: player, line: null } as unknown as ScoutRow),
+    ).toMatchObject({ reserve: false, out: false });
   });
 
   it('shapes a goalie over his starts', async () => {

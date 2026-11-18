@@ -252,8 +252,9 @@ function toTeamPlayer(player: ScoutRosterPlayer): TeamPlayer {
     teamAbbrev: player.teamAbbrev,
     type,
     positions: player.positions,
-    injuryStatus: player.injuryStatus,
-    slot: player.slot,
+    // The spec calls these "absent", but the BFF writes an unset field as null.
+    injuryStatus: player.injuryStatus ?? undefined,
+    slot: player.slot ?? undefined,
     reserve: player.reserve,
     reserveEligible: player.reserveEligible,
     out: player.out,
@@ -282,8 +283,9 @@ function toScoutPlayer(row: PlayerScoutRow): ScoutPlayer {
     nhlId: row.nhlId,
     type,
     owner: row.owner ? { teamName: row.owner.teamName, mine: row.owner.mine } : null,
-    slot: row.slot,
-    injuryStatus: row.injuryStatus,
+    // The spec calls these "absent", but the BFF writes an unset field as null.
+    slot: row.slot ?? undefined,
+    injuryStatus: row.injuryStatus ?? undefined,
     then: row.then ? projectionOf(type, playerId, row.then) : null,
     thenProjected: new Set(row.then ? Object.keys(row.then.stats) : []),
     lineup: row.lineup
