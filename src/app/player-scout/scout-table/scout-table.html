@@ -177,6 +177,13 @@
                       ownerTag(entry.row)
                     }}</span>
                   }
+                  @if (injuryTag(entry.row); as injury) {
+                    <span
+                      class="scout-tag scout-tag--injury"
+                      [class.scout-tag--injury-out]="injury.out"
+                      >{{ injury.label }}</span
+                    >
+                  }
                   @if (lineupTag(entry.row); as listed) {
                     <span class="scout-tag scout-tag--lineup">{{ listed }}</span>
                   }

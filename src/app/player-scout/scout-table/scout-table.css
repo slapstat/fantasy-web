@@ -145,6 +145,18 @@
   padding-inline: 0;
 }
 
+/* An injury: in the injury red the drop list's Out tag wears when it keeps him out, and in the
+   warning's brown when day-to-day, since he may well play. */
+.scout-tag--injury {
+  border-color: var(--color-warning-text);
+  color: var(--color-warning-text);
+}
+
+.scout-tag--injury-out {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
 .scout-tag--held {
   border-color: transparent;
   color: var(--color-text-subtle);
