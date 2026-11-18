@@ -15,6 +15,7 @@ import {
   OverlayRef,
 } from '@angular/cdk/overlay';
 import { TemplatePortal } from '@angular/cdk/portal';
+import { followAnchor } from './follow-anchor';
 import { OpenPopovers } from './open-popovers';
 
 /**
@@ -162,6 +163,11 @@ export class PopoverTriggerDirective {
         this.close();
       }
     });
+
+    // Moved, hidden or scrolled away under an open menu: follow the button, and close with it
+    // rather than float on with nothing to point at. Focus is not sent after a button that has
+    // left the window, which would scroll the page back to it.
+    followAnchor(this.overlayRef, this.host.nativeElement, () => this.close(false));
 
     this.openPopovers.add(this);
     this.isOpen.set(true);

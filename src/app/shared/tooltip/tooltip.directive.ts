@@ -15,6 +15,7 @@ import {
   OverlayRef,
 } from '@angular/cdk/overlay';
 import { ComponentPortal } from '@angular/cdk/portal';
+import { followAnchor } from '../popover/follow-anchor';
 import { TooltipComponent, TooltipText } from './tooltip';
 
 const TOOLTIP_POSITIONS: ConnectedPosition[] = [
@@ -76,6 +77,9 @@ export class TooltipDirective {
     });
     this.bubbleRef = this.overlayRef.attach(new ComponentPortal(TooltipComponent));
     this.bubbleRef.setInput('text', text);
+    // A row that moves under a resting pointer fires no mouseleave: the bubble follows its
+    // trigger, and goes with it when the trigger leaves the screen.
+    followAnchor(this.overlayRef, this.host.nativeElement, () => this.hide());
   }
 
   hide(): void {

@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PopoverTriggerDirective } from './popover-trigger.directive';
 import { OpenPopovers } from './open-popovers';
 
@@ -158,5 +158,27 @@ describe('PopoverTriggerDirective and OpenPopovers', () => {
     button('chosen').click();
 
     expect(document.activeElement?.id).toEqual('made-choice');
+  });
+
+  it('closes, and says so on the trigger, when its trigger scrolls out of the window', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
+      frames.push(callback),
+    );
+    try {
+      const { fixture, button } = setup();
+      button('labelled').click();
+      fixture.detectChanges();
+      button('labelled').getBoundingClientRect = () =>
+        ({ top: -300, bottom: -270, left: 10, right: 110, width: 100, height: 30 }) as DOMRect;
+
+      frames.splice(0).forEach((callback) => callback(0));
+      fixture.detectChanges();
+
+      expect(panel()).toBeNull();
+      expect(button('labelled').getAttribute('aria-expanded')).toBe('false');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
