@@ -476,11 +476,6 @@ select:focus-visible,
   font-variant-numeric: tabular-nums;
 }
 
-/* The word that says what the figure is, quieter than the figure. */
-.pill--drop .pill-cost-label {
-  font-weight: 400;
-}
-
 .pill--drop.pill--active .pill-name,
 .pill--drop.pill--active .pill-cost {
   color: var(--color-primary-contrast);
