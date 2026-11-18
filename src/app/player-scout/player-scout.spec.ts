@@ -741,12 +741,16 @@ describe('PlayerScoutComponent', () => {
     expect(ngMocks.input(ngMocks.find(fixture, ScoutTableComponent), 'dropName')).toBe('');
     expect(page.valuation()?.byPlayer.get('203')?.starts).toBe(10);
     const floor = ngMocks.find(fixture, '.floor');
-    expect(ngMocks.formatText(floor)).toContain('Suggested drops');
+    expect(ngMocks.formatText(floor)).toContain('Pick a drop to price each pickup');
     const chips = ngMocks.findAll(fixture, '.pill--drop');
     const chipText = (selector: string) =>
       chips.map((chip) => ngMocks.formatText(ngMocks.find(chip, selector)));
     expect(chipText('.pill-name')).toEqual(['Mine 203', 'Mine 202', 'Mine 210', 'Mine 207']);
-    expect(chipText('.pill-cost')).toEqual(['-5.0', '-7.0', '-11.0', '-70.0']);
+    expect(chipText('.pill-cost')).toEqual(['costs 5.0', 'costs 7.0', 'costs 11.0', 'costs 70.0']);
+    // A screen reader hears each chip as one phrase, not the pieces run together.
+    expect(chips[0].attributes['aria-label']).toMatch(
+      /^Drop Mine 203, [A-Z/]+(, [^,]+)?, costs 5.0$/,
+    );
     expect(chips.map((chip) => chip.attributes['aria-checked'])).toEqual([
       'false',
       'false',
@@ -760,7 +764,7 @@ describe('PlayerScoutComponent', () => {
     ngMocks.click(toggle);
     fixture.detectChanges();
     expect(page.rosterOpen()).toBe(true);
-    expect(ngMocks.formatText(toggle)).toBe('Show less');
+    expect(ngMocks.formatText(toggle)).toBe('Hide roster');
     ngMocks.click(toggle);
     fixture.detectChanges();
     expect(page.rosterOpen()).toBe(false);
@@ -799,7 +803,7 @@ describe('PlayerScoutComponent', () => {
       .findAll(fixture, '.roster-table thead th')
       .map((th) => ngMocks.formatText(th));
     expect(headings).toEqual(['Player', 'Points', 'Starts/Games left', 'Cost to drop', 'Streamer']);
-    expect(ngMocks.formatText(ngMocks.find(fixture, '.roster-more'))).toBe('Show all 12');
+    expect(ngMocks.formatText(ngMocks.find(fixture, '.roster-more'))).toBe('Show all (12)');
   });
 
   it('prices the cost to drop in points, or in Z-Score in a category league', async () => {
@@ -942,7 +946,7 @@ describe('PlayerScoutComponent', () => {
       'Mine 207',
     ]);
     expect(ngMocks.formatText(chips[2])).toContain('Streamer');
-    expect(ngMocks.formatText(ngMocks.find(chips[2], '.pill-cost'))).toBe('-68.0');
+    expect(ngMocks.formatText(ngMocks.find(chips[2], '.pill-cost'))).toBe('costs 68.0');
 
     // Dropped for the best free centre, the spot becomes a hold: his 7 a game in it, 0.2 more
     // than the stream it no longer makes, rather than 6.5 more than the streamer's own 0.5.
@@ -1283,7 +1287,7 @@ describe('PlayerScoutComponent', () => {
       .findAll(fixture, '.pill--drop')
       .find((chip) => chip.attributes['aria-checked'] === 'true')!;
     expect(ngMocks.formatText(ngMocks.find(chosen, '.pill-name'))).toBe('Mine 203');
-    expect(ngMocks.formatText(ngMocks.find(chosen, '.pill-cost'))).toBe('-5.0');
+    expect(ngMocks.formatText(ngMocks.find(chosen, '.pill-cost'))).toBe('costs 5.0');
     expect(ngMocks.formatText(ngMocks.find(chosen, '.drop-tag--out'))).toBe('O');
   });
 
