@@ -5,7 +5,7 @@ import { ScoutRow } from './scout-ranking';
 const OUT_SLOTS = new Set(['IR', 'IR+', 'IR-LT', 'IR-NR', 'NA']);
 
 /** Injury statuses that keep a player out, on either platform; day-to-day is not one. */
-const OUT_STATUSES = new Set([
+export const OUT_STATUSES: ReadonlySet<string> = new Set([
   'O',
   'IR',
   'IR-LT',

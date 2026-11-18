@@ -30,6 +30,7 @@ interface RowOptions {
   readonly adjusted?: number | null;
   readonly positionRank?: string | null;
   readonly lineup?: PageListing | null;
+  readonly injuryStatus?: string;
 }
 
 function row(playerId: number, name: string, rank: number, options: RowOptions = {}): ScoutRow {
@@ -57,6 +58,7 @@ function row(playerId: number, name: string, rank: number, options: RowOptions =
     then,
     thenProjected: new Set(then ? ['goals', 'assists'] : []),
     lineup: options.lineup ?? null,
+    injuryStatus: options.injuryStatus,
   };
   return {
     scout,
@@ -161,6 +163,21 @@ describe('ScoutTableComponent', () => {
 
     const tags = ngMocks.findAll(fixture, '.scout-tag--lineup');
     expect(tags.map((tag) => ngMocks.formatText(tag))).toEqual(['D2 · PP1 · PK2']);
+  });
+
+  it('tags an injured player with his status, in red when it keeps him out, and a healthy one with none', () => {
+    const fixture = render([
+      row(1, 'Dylan Guenther', 1, { injuryStatus: 'IR' }),
+      row(2, 'Nick Schmaltz', 2, { injuryStatus: 'DAY_TO_DAY' }),
+      row(3, 'Logan Cooley', 3, { injuryStatus: 'INJURY_RESERVE' }),
+      row(4, 'Vince Dunn', 4),
+    ]);
+
+    const tags = ngMocks.findAll(fixture, '.scout-tag--injury');
+    expect(tags.map((tag) => ngMocks.formatText(tag))).toEqual(['IR', 'DTD', 'IR']);
+    expect(
+      tags.map((tag) => tag.nativeElement.classList.contains('scout-tag--injury-out')),
+    ).toEqual([true, false, true]);
   });
 
   it('shows no adjusted column while the list is ranked by the score', () => {
