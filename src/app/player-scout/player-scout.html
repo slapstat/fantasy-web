@@ -195,9 +195,9 @@
                       <div class="floor-body">
                         <span class="floor-lead">
                           @if (dropCandidates().length > 0) {
-                            Suggested drops
+                            Pick a drop to price each pickup
                           } @else {
-                            Suggested drops: none of your {{ shown() }} has a projection.
+                            No drop to suggest: none of your {{ shown() }} has a projection.
                           }
                         </span>
                         @if (dropCandidates().length > 0) {
@@ -212,6 +212,7 @@
                                 role="radio"
                                 [class.pill--active]="chip === drop()"
                                 [attr.aria-checked]="chip === drop()"
+                                [attr.aria-label]="dropChipLabel(chip)"
                                 (click)="pickDrop(chip.player.playerId)"
                               >
                                 <span class="pill-name">{{ chip.player.name }}</span>
@@ -223,7 +224,7 @@
                                     chip.player.injuryStatus ?? 'Out'
                                   }}</span>
                                 }
-                                <span class="pill-cost">{{ dropLossText(chip) }}</span>
+                                <span class="pill-cost">costs {{ dropCost(chip) }}</span>
                               </button>
                             }
                           </div>
@@ -243,7 +244,7 @@
                 (click)="toggleRoster()"
               >
                 @if (rosterOpen()) {
-                  Show less
+                  Hide roster
                 } @else {
                   Show all ({{ roster().length }})
                 }
@@ -338,7 +339,7 @@
                     @if (rosterAll()) {
                       Show fewer
                     } @else {
-                      Show all {{ roster().length }}
+                      Show all ({{ roster().length }})
                     }
                   </button>
                 }

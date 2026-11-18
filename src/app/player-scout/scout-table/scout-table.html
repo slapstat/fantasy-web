@@ -110,21 +110,20 @@
           </th>
         }
         @if (gaining()) {
-          <!-- The lineup's +/-: against the drop once one is chosen, and before that, with a roster
+          <!-- The lineup gain: against the drop once one is chosen, and before that, with a roster
                spot open, what he adds in it. One line like every other heading: whom it is set
                against is said once, by the drop chip on the line above the list. -->
           <th scope="col" class="num gain-col stat-col--start" [attr.aria-sort]="ariaSort('gain')">
             <button
               type="button"
               class="sort"
-              aria-label="Lineup plus-minus"
               [appTooltip]="gainTip()"
               (click)="sortBy.emit('gain')"
             >
               @if (sort().key === 'gain') {
                 <app-icon [name]="sort().descending ? 'arrow-down' : 'arrow-up'" [size]="14" />
               }
-              Lineup +/&minus;
+              Lineup gain
             </button>
           </th>
         }
@@ -198,7 +197,7 @@
                 @if (gaining() && priced(entry.row)) {
                   <span class="player-gains">
                     <span class="player-gain" [class.player-gain--top]="isTopGain(entry.row)">
-                      <span class="player-gain-label">Lineup +/&minus;</span>
+                      <span class="player-gain-label">Lineup gain</span>
                       &ngsp;
                       @if (gain(entry.row); as gain) {
                         <span class="gain gain--{{ gain.dir }}">{{ gain.text }}</span>
@@ -213,7 +212,7 @@
                         >Them {{ theirGain(entry.row)?.text ?? '?' }}</span
                       >
                     } @else if (scoreGain(entry.row); as more) {
-                      <span class="player-gain player-gain--note">{{ more.text }} proj</span>
+                      <span class="player-gain player-gain--note">{{ more.text }} all games</span>
                     }
                   </span>
                 }
@@ -276,7 +275,7 @@
                   >
                 } @else if (scoreGain(entry.row); as more) {
                   <span class="delta delta--note" [appTooltip]="scoreGainTip()"
-                    >{{ more.text }} proj</span
+                    >{{ more.text }} all games</span
                   >
                 }
               }

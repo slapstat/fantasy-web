@@ -983,13 +983,17 @@ export class PlayerScoutComponent {
   }
 
   /**
-   * "-143.1": his cost written as a loss on his chip, signed as the list's lineup gains are, so
-   * the two read as one measure and neither is mistaken for a projection.
+   * "Drop Mine 203, Streamer, costs 5.0": the chip read as one phrase, where its pieces would run
+   * together ("Mine 203G-5.0") without the spaces the pills draw.
    */
-  dropLossText(entry: RosterEntry): string {
-    const cost = entry.value?.marginal ?? null;
-    const text = this.formatScore(cost);
-    return cost !== null && Number(text) > 0 ? `-${text}` : text;
+  dropChipLabel(entry: RosterEntry): string {
+    let tag = '';
+    if (entry.streamer) {
+      tag = ', Streamer';
+    } else if (entry.player.out) {
+      tag = `, ${entry.player.injuryStatus ?? 'Out'}`;
+    }
+    return `Drop ${entry.player.name}, ${entry.player.positions.join('/')}${tag}, costs ${this.dropCost(entry)}`;
   }
 
   /** Whether the roster is unfolded under the room line: folded until asked for, and with each league. */

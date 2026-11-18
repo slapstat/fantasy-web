@@ -869,6 +869,12 @@ select:focus-visible,
     min-width: 0;
   }
 
+  /* The lead wraps short of Show all, which sits on its line. */
+  .floor-lead {
+    padding-right: 7.5rem;
+    white-space: normal;
+  }
+
   .floor-body {
     align-items: stretch;
     flex: 1 1 auto;
