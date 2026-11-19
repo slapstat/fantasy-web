@@ -115,6 +115,17 @@ describe('RankFloorComponent', () => {
     expect(picked).toHaveBeenCalledWith(299);
   });
 
+  it('holds an own depth to nothing while no count of the ranked has landed', () => {
+    const { fixture, picked } = render(null, null, 0);
+    const own = open(fixture).querySelector<HTMLInputElement>('.own-input')!;
+    expect(own.getAttribute('max')).toBeNull();
+
+    own.value = '200';
+    own.dispatchEvent(new Event('input'));
+
+    expect(picked).toHaveBeenCalledWith(200);
+  });
+
   it('gives the whole list back on the cross, and leaves focus on the pill', () => {
     const { fixture, cleared } = render(200);
 

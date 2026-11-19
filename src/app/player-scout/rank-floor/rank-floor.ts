@@ -81,8 +81,12 @@ export class RankFloorComponent {
     () => this.rostered() !== null && this.floor() === this.rostered(),
   );
 
-  /** The highest an own number may go: past the last place ranked it would cut nobody. */
-  readonly deepest = computed(() => Math.max(this.ranked() - 1, 1));
+  /**
+   * The highest an own number may go: past the last place ranked it would cut nobody. Null while
+   * nothing says how many are ranked, where a ceiling would be a guess that holds the reader to
+   * the first place in the list.
+   */
+  readonly deepest = computed(() => (this.ranked() > 1 ? this.ranked() - 1 : null));
 
   /**
    * The pill's whole face on a phone, so it and the two movers beside it keep to one line. Null
@@ -108,7 +112,9 @@ export class RankFloorComponent {
       this.cleared.emit();
       return;
     }
-    this.picked.emit(Math.min(Math.floor(value), this.deepest()));
+    const deepest = this.deepest();
+    const depth = Math.floor(value);
+    this.picked.emit(deepest === null ? depth : Math.min(depth, deepest));
   }
 
   /** The cross. It takes the pill's other half off the line, so focus goes back to the pill. */

@@ -73,7 +73,7 @@
         class="own-input"
         type="number"
         min="1"
-        [max]="deepest()"
+        [attr.max]="deepest()"
         step="1"
         inputmode="numeric"
         [value]="floor() ?? ''"
