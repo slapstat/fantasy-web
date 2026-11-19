@@ -246,7 +246,7 @@ describe('ScoutTableComponent', () => {
     expect(games && ngMocks.formatText(ngMocks.find(games, '.delta'))).toBe('-4');
   });
 
-  it('greys a change too small to mean anything, and writes none at all', () => {
+  it('greys a change too small to mean anything, and writes a figure that stood still as "0"', () => {
     const fixture = render(
       [row(1, 'Steady Eddie', 1, { thenRank: 1, thenToi: 1370, thenGoals: 15 })],
       { compare: true },
@@ -255,10 +255,31 @@ describe('ScoutTableComponent', () => {
     const toi = ngMocks.find(fixture, 'td.toi-col .delta');
     expect(ngMocks.formatText(toi)).toBe('+0:10');
     expect(toi.nativeElement.classList).toContain('delta--flat');
-    // A change of nothing is written as nothing; the line stays, so the rows keep one height.
-    const rank = ngMocks.find(fixture, 'td.rank-col .delta');
-    expect(ngMocks.formatText(rank)).toBe('');
-    expect(rank.nativeElement.classList).toContain('delta--flat');
+
+    // The rank, the score and each category stood still: a bare nought in the flat tone, no sign
+    // and no decimals, so a blank is left to mean "no line to compare with" and nothing else.
+    for (const column of ['td.rank-col', 'td.score-col', 'td.stat-col']) {
+      const delta = ngMocks.find(fixture, `${column} .delta`);
+      expect(ngMocks.formatText(delta)).toBe('0');
+      expect(delta.nativeElement.classList).toContain('delta--flat');
+    }
+    const games = ngMocks
+      .findAll(fixture, 'td.num')
+      .find((cell) => ngMocks.formatText(cell).startsWith('70'));
+    expect(games && ngMocks.formatText(ngMocks.find(games, '.delta'))).toBe('0');
+  });
+
+  it('writes no change at all where there is no line to compare with', () => {
+    // His goals and assists are projected today but were not on the chosen day, so those cells
+    // have nothing to measure: they stay blank, where a figure that was measured reads "0".
+    const noLine = row(1, 'Steady Eddie', 1, { thenRank: 1, thenToi: 1370, thenGoals: 15 });
+    const fixture = render(
+      [{ ...noLine, scout: { ...noLine.scout, thenProjected: new Set<ScoringStatKey>() } }],
+      { compare: true },
+    );
+
+    expect(ngMocks.findAll(fixture, 'td.stat-col .delta')).toHaveLength(0);
+    expect(ngMocks.formatText(ngMocks.find(fixture, 'td.rank-col .delta'))).toBe('0');
   });
 
   it('marks a player the model had no line for on the day as new, with no change', () => {
