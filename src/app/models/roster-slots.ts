@@ -11,6 +11,18 @@ export function skaterSlotCount(roster: RosterSlots): number {
 }
 
 /**
+ * Every player a team holds at once, goalies and bench included. Times the teams in a league,
+ * this is how deep a league of this shape rosters, and so the place where a player stops being
+ * somebody else's bench and starts being a find.
+ *
+ * <p>Injured reserve is left out: a spot that can only hold a player who cannot play is not
+ * depth the league is choosing players for.
+ */
+export function rosteredSlotCount(roster: RosterSlots): number {
+  return skaterSlotCount(roster) + roster.g;
+}
+
+/**
  * Roster slots written before the wing (W) and forward (F) flex slots existed have no such keys,
  * which would make every sum over them NaN. They read as none, as they do on the server.
  */

@@ -26,6 +26,7 @@ import { LensSwitchComponent } from './lens-switch/lens-switch';
 import { ScoutTableComponent } from './scout-table/scout-table';
 import { DropChipComponent } from './drop-chip/drop-chip';
 import { CompareMenuComponent } from './compare-menu/compare-menu';
+import { RankFloorComponent } from './rank-floor/rank-floor';
 
 const LEAGUE: ChosenLeague = { platform: 'YAHOO', leagueId: '465.l.9', name: 'The Gordie Howes' };
 
@@ -185,6 +186,11 @@ function league(): ScoutList {
       scoutPlayer(skater(301, 30, 30), skater(301, 35, 35), ['C'], THEIRS),
     ],
   };
+}
+
+/** The league's answer around a cast of one test's own. */
+function listOf(players: readonly ScoutPlayer[]): ScoutList {
+  return { ...league(), players: [...players] };
 }
 
 describe('PlayerScoutComponent', () => {
@@ -396,6 +402,104 @@ describe('PlayerScoutComponent', () => {
     page.pool.set('all');
     page.movers.set('fallers');
     expect(ids(page.filtered())).toEqual(['301']);
+  });
+
+  it('holds the list to a depth, counting a player inside it on either line', async () => {
+    // Five players, each ranked where his score puts him: one steady at the top, one steady
+    // behind him, one who has climbed into the top three, one who has dropped out of it, and one
+    // fourth on both lines.
+    players.mockReturnValue(
+      of(
+        listOf([
+          scoutPlayer(skater(401, 40, 50), skater(401, 40, 50)),
+          scoutPlayer(skater(402, 30, 30), skater(402, 30, 30)),
+          scoutPlayer(skater(403, 20, 20), skater(403, 1, 1)),
+          scoutPlayer(skater(404, 2, 2), skater(404, 25, 25)),
+          scoutPlayer(skater(405, 15, 15), skater(405, 15, 15)),
+        ]),
+      ),
+    );
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    page.toggleCompare();
+
+    page.setRankFloor(3);
+
+    // The climber by today's place, the faller by the one he held on the day: a floor that hid
+    // him would answer the opposite of the question Fallers asks.
+    expect(ids(page.filtered())).toEqual(['401', '402', '403', '404']);
+
+    page.clearRankFloor();
+    expect(page.filtered()).toHaveLength(5);
+  });
+
+  it('asks the depth only while something is compared, and keeps it when the comparison goes', async () => {
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+
+    page.setRankFloor(3);
+    expect(page.filtered().length).toBeGreaterThan(3);
+
+    page.toggleCompare();
+    expect(page.filtered().length).toBeLessThanOrEqual(3);
+
+    page.clearCompare();
+    expect(page.rankFloor()).toBe(3);
+    expect(page.filtered().length).toBeGreaterThan(3);
+  });
+
+  it('goes back to the first page when the depth changes: it is another list', async () => {
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    page.pool.set('all');
+    page.toggleCompare();
+    page.goToPage(1);
+    expect(page.currentPage()).toBe(1);
+
+    page.setRankFloor(34);
+
+    expect(page.currentPage()).toBe(0);
+    expect(page.pageCount()).toBe(2);
+  });
+
+  it('counts the league its own rostered depth, bench and goalies in', async () => {
+    settings = {
+      ...SETTINGS,
+      rosterSlots: { ...SETTINGS.rosterSlots, g: 2, bn: 4 },
+      leagueSize: 10,
+    };
+    const fixture = await render();
+
+    // 2 C, 2 LW, 2 RW, 4 D, 1 Util, 4 bench and 2 G is seventeen spots a team.
+    expect(fixture.point.componentInstance.rosteredDepth()).toBe(170);
+  });
+
+  it('says the depth in the line that stands where the list would be', async () => {
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    page.toggleCompare();
+    page.setRankFloor(200);
+    page.search.set('nobody');
+
+    expect(page.emptyText()).toBe('No available player inside the top 200 matches the search.');
+  });
+
+  it('offers the depth only with the comparison, and takes the answers it gives', async () => {
+    const fixture = await render();
+    const page = fixture.point.componentInstance;
+    expect(ngMocks.findAll(fixture, RankFloorComponent)).toHaveLength(0);
+
+    page.toggleCompare();
+    fixture.detectChanges();
+    const chip = ngMocks.find(fixture, RankFloorComponent);
+    expect(ngMocks.input(chip, 'depth')).toBe(page.rosteredDepth());
+    expect(ngMocks.input(chip, 'ranked')).toBe(page.rankedCount());
+
+    ngMocks.output(chip, 'picked').emit(150);
+    expect(page.rankFloor()).toBe(150);
+
+    ngMocks.output(chip, 'cleared').emit();
+    expect(page.rankFloor()).toBeNull();
   });
 
   it('presses Risers or Fallers as a chip: that way only, and everyone again on the second press', async () => {
