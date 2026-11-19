@@ -19,7 +19,7 @@ import {
 } from '../draft-projection/projection-defaults';
 import { DEFAULT_DECIMAL_SETTINGS } from '../draft-projection/projection-settings-section/model';
 import { nhlTeamKey } from '../models/nhl-team';
-import { withFlexSlots } from '../models/roster-slots';
+import { rosteredSlotCount, withFlexSlots } from '../models/roster-slots';
 import { Projection, ScoredProjection } from '../models/projection.model';
 import { isAllSkaters } from '../models/position.model';
 import { ScoringStatKey } from '../models/stat-key.model';
@@ -79,6 +79,7 @@ import { ScoutTableComponent } from './scout-table/scout-table';
 import { otherRosters, tradeable } from './trade-roster';
 import { LensSwitchComponent } from './lens-switch/lens-switch';
 import { DropChipComponent } from './drop-chip/drop-chip';
+import { RankFloorComponent } from './rank-floor/rank-floor';
 import {
   formatDay,
   localToday,
@@ -163,6 +164,7 @@ export interface LeagueTeamOption {
     ScoutTableComponent,
     DropChipComponent,
     CompareMenuComponent,
+    RankFloorComponent,
     TeamLogoComponent,
     TooltipDirective,
   ],
@@ -427,6 +429,37 @@ export class PlayerScoutComponent {
   readonly movers = signal<ScoutMovers>('all');
   readonly search = signal('');
 
+  /**
+   * The deepest place in the ranking the list still counts, or null for all of it. Only asked
+   * with a comparison on, as the movers are: the list without one opens ranked on the projection,
+   * where the thin records are pages away, and it is sorting by the change that carries a
+   * call-up from nowhere to the first row.
+   *
+   * <p>Kept when the comparison is switched off, as the day is, so turning it on again lands on
+   * the list the reader left.
+   */
+  readonly rankFloor = signal<number | null>(null);
+
+  /** The floor as it is actually applied: none while nothing is compared. */
+  private readonly floor = computed(() => (this.compare() ? this.rankFloor() : null));
+
+  /** How many players a league of this size and these slots rosters: the depth the menu offers. */
+  readonly rosteredDepth = computed(() => {
+    const { leagueSize, rosterSlots } = this.scoring();
+    return leagueSize * rosteredSlotCount(rosterSlots);
+  });
+
+  /** How many players are ranked at all, so a depth that would cut nobody can be drawn as such. */
+  readonly rankedCount = computed(() => this.ranked().length);
+
+  setRankFloor(floor: number): void {
+    this.rankFloor.set(floor);
+  }
+
+  clearRankFloor(): void {
+    this.rankFloor.set(null);
+  }
+
   /** Risers or Fallers pressed: that way only, or, pressed again, everyone. */
   toggleMovers(which: Exclude<ScoutMovers, 'all'>): void {
     this.movers.update((movers) => (movers === which ? 'all' : which));
@@ -664,7 +697,14 @@ export class PlayerScoutComponent {
   readonly filtered = computed<readonly ScoutRow[]>(() => {
     const movers = this.compare() ? this.movers() : 'all';
     const needle = this.search().trim().toLowerCase();
+    const floor = this.floor();
     return this.atPositions().filter((row) => {
+      // Inside the floor on either line, not only today's: a player who has fallen out of it is
+      // the fall worth seeing, and a floor that hid him would answer the opposite of the question
+      // Fallers asks.
+      if (floor !== null && row.rank > floor && (row.thenRank === null || row.thenRank > floor)) {
+        return false;
+      }
       const delta = row.delta ?? 0;
       if (movers === 'risers' && delta <= 0) {
         return false;
@@ -1124,7 +1164,11 @@ export class PlayerScoutComponent {
         all: 'No player',
       }[pool as Exclude<ScoutPool, `team:${string}`>] ??
       `No player on ${pool.slice('team:'.length)}`;
-    const where = this.positions().size === 0 ? '' : ' at these positions';
+    const positions = this.positions().size === 0 ? '' : ' at these positions';
+    const floor = this.floor();
+    // The floor goes into the sentence's subject rather than its end, so the reason the list is
+    // empty is the first thing read and not a clause after the verb.
+    const where = floor === null ? positions : `${positions} inside the top ${floor}`;
     switch (this.compare() ? this.movers() : 'all') {
       case 'risers':
         return `${who}${where} has risen in the projection since the chosen day.`;
@@ -1157,6 +1201,7 @@ export class PlayerScoutComponent {
       this.lineupRole(),
       this.positions(),
       this.movers(),
+      this.rankFloor(),
       this.search(),
       this.league(),
       this.since(),

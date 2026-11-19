@@ -1,0 +1,85 @@
+<!-- One pill, drawn as the comparison's is: white in rest, navy with a depth on it, and then two
+     buttons in the one pill. The words open the menu; the cross gives the whole list back. -->
+<span class="floor">
+  <button
+    #opener
+    #menu="appPopover"
+    type="button"
+    class="floor-btn"
+    [class.floor-btn--on]="on()"
+    [appPopover]="floorMenu"
+    popoverAlign="start"
+    popoverLabel="Rank cut-off"
+  >
+    @if (short(); as face) {
+      <span class="floor-value">{{ face }}</span>
+    } @else if (!on()) {
+      <span class="floor-value">Any rank</span>
+    } @else {
+      <!-- The word carries the space that parts it from the number, so the two read as one
+           phrase; a lead this short tells on a gap laid on top of that space. -->
+      <span class="floor-lead">Top </span>
+      <span class="floor-value">{{ floor() }}</span>
+    }
+    <app-icon class="chevron" name="chevron-down" [size]="14" />
+  </button>
+  @if (on()) {
+    <button
+      type="button"
+      class="floor-clear"
+      appTooltip="Show every rank"
+      aria-label="Show every rank"
+      (click)="clear()"
+    >
+      <app-icon name="close" [size]="14" />
+    </button>
+  }
+</span>
+
+<!-- The menu answers "how deep": the league's own depth, then a ladder of round ones, then the
+     reader's own number. No title; the pill that opened it has said what it is for. -->
+<ng-template #floorMenu>
+  <div class="menu">
+    @if (rostered(); as rostered) {
+      <button
+        type="button"
+        class="rostered"
+        [attr.aria-pressed]="rosteredPicked()"
+        [attr.data-popover-initial-focus]="rosteredPicked() ? '' : null"
+        (click)="pick(rostered, menu)"
+      >
+        Rostered depth ({{ rostered }})
+      </button>
+      <p class="or" aria-hidden="true">or</p>
+    }
+    <div class="steps" role="group" aria-label="Rank cut-offs">
+      @for (step of steps; track step) {
+        <button
+          type="button"
+          class="step"
+          [class.step--picked]="floor() === step"
+          [disabled]="!cuts(step)"
+          [attr.aria-pressed]="cuts(step) ? floor() === step : null"
+          [attr.data-popover-initial-focus]="floor() === step ? '' : null"
+          (click)="pick(step, menu)"
+        >
+          {{ step }}
+        </button>
+      }
+    </div>
+    <label class="own">
+      <span class="own-label">Own depth</span>
+      <input
+        class="own-input"
+        type="number"
+        min="1"
+        [max]="deepest()"
+        step="1"
+        inputmode="numeric"
+        [value]="floor() ?? ''"
+        placeholder="Any"
+        (input)="onOwn($event)"
+      />
+    </label>
+  </div>
+</ng-template>

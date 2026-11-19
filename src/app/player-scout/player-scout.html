@@ -452,6 +452,16 @@
                 Fallers
               </button>
             </div>
+            <!-- How deep the list counts. It sits with the change, since that is the order it has
+                 work to do in: ranked on the projection the thin records are pages away, while
+                 the biggest change is a call-up's, whose games went from a handful to a season. -->
+            <app-rank-floor
+              [floor]="rankFloor()"
+              [depth]="rosteredDepth()"
+              [ranked]="rankedCount()"
+              (picked)="setRankFloor($event)"
+              (cleared)="clearRankFloor()"
+            />
           }
           <!-- The drop picked: whom the lineup column is set against, a way back to the roster
                to pick another, and a way out. -->
