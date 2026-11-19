@@ -22,8 +22,9 @@
 }
 
 /* With a comparison on, every figure wears its change underneath, small and coloured by which
-   way it went: green up, red down, grey for a change too small to mean anything. The figure
-   stays the figure, so a column still reads as one line of numbers. */
+   way it went: green up, red down, grey for one too small to mean anything and for a bare "0",
+   the figure that was measured and did not move. The figure stays the figure, so a column still
+   reads as one line of numbers. */
 .figure-now {
   display: block;
 }
@@ -35,7 +36,8 @@
   font-variant-numeric: tabular-nums;
   font-weight: var(--weight-semibold);
   line-height: 1.3;
-  /* A change of nothing is written as nothing, and the line stays, so the rows keep one height. */
+  /* A figure with no line to compare with wears nothing, and its line stays blank, so the rows
+     keep one height; one that stood still wears "0". */
   min-height: calc(var(--text-xs) * 1.3);
 }
 
@@ -77,6 +79,12 @@
 
 .scout-table--lens-change td.score-col .delta {
   font-weight: var(--weight-bold);
+}
+
+/* A nought stays quiet wherever it sits. The score's change is bold through the change lens
+   because it is the figure the order runs on, but a figure that did not move is not emphasis. */
+.scout-table--lens-change td.score-col .delta--flat {
+  font-weight: normal;
 }
 
 /* The rank wears the places gained or lost underneath, like any other figure, so the two columns

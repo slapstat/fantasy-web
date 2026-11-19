@@ -284,8 +284,10 @@ export class ScoutTableComponent {
     if (row.adjusted === null) {
       return '';
     }
-    // The replacement player himself is nought, written as one rather than left blank.
-    return signed(row.adjusted, this.scoreDigits()).text || (0).toFixed(this.scoreDigits());
+    // The replacement player himself is nought. This is a figure, not a change, so it keeps the
+    // score's own precision ("0.00") rather than the bare "0" an unmoved change wears.
+    const adjusted = signed(row.adjusted, this.scoreDigits());
+    return adjusted.dir === 'flat' ? (0).toFixed(this.scoreDigits()) : adjusted.text;
   }
 
   /** The change in score since the day; null without a then-line or a comparison. */
@@ -501,15 +503,17 @@ export class ScoutTableComponent {
 }
 
 /**
- * A change written with its sign to so many decimals. One that rounds to nothing is written as
- * nothing: five days into a comparison most figures have not moved, and a "±0.0" under each of
- * them filled the table with marks that said so (Alexander, 2026-10-20). The cell keeps its
- * second line, blank, so the rows stay one height.
+ * A change written with its sign to so many decimals. One that rounds to nothing is a bare "0" in
+ * the flat tone: a figure that was measured and did not move. It was written as nothing until
+ * 2026-11-19, which left a blank saying either that or "there is no line to compare with", two
+ * different things a reader cannot tell apart; now only the second is blank (Alexander,
+ * 2026-11-19). The nought carries no sign and no decimals, in every column, because it is a state
+ * and not a measurement: "0.00" under a z-score reads as a change too small to print.
  */
 function signed(change: number, digits: number): Delta {
   const text = change.toFixed(digits);
   if (Number(text) === 0) {
-    return { text: '', dir: 'flat' };
+    return { text: '0', dir: 'flat' };
   }
   return { text: change > 0 ? `+${text}` : text, dir: change > 0 ? 'up' : 'down' };
 }
@@ -544,10 +548,10 @@ function formatIce(seconds: number): string {
   return `${seconds < 0 ? '-' : ''}${minutes}:${rest}`;
 }
 
-/** A change in ice, signed: "+6:00", "-1:30"; nothing for none, as {@link signed} writes it. */
+/** A change in ice, signed: "+6:00", "-1:30"; a bare "0" for none, as {@link signed} writes it. */
 function formatIceChange(seconds: number): string {
   if (Math.round(seconds) === 0) {
-    return '';
+    return '0';
   }
   return seconds > 0 ? `+${formatIce(seconds)}` : formatIce(seconds);
 }
